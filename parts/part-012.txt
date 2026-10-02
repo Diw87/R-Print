@@ -1,0 +1,500 @@
+
+<main id="homePanel" class="home-panel" style="display:none">
+  <div class="home-title-row">
+    <div class="home-title-icon">
+      <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M9.5 20v-6h5v6"/></svg>
+    </div>
+    <h1>Home</h1>
+  </div>
+
+  <section class="home-welcome-card">
+    <div class="home-welcome">
+      <h2>Bem-vindo RPrint!</h2>
+      <div id="homeToday" class="home-date"></div>
+      <div class="home-kpis">
+        <div class="home-kpi">
+          <div class="home-kpi-icon">
+            <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M10 13h6M10 17h4"/></svg>
+          </div>
+          <div><strong id="kpiQuotesToday">0</strong><span>Orçamentos hoje</span></div>
+        </div>
+        <div class="home-kpi">
+          <div class="home-kpi-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 8.5c-.8-.7-1.8-1-3-1-1.7 0-3 .8-3 2s1.1 1.8 3.1 2.2c2 .4 3.1 1 3.1 2.3s-1.3 2.2-3.2 2.2c-1.3 0-2.5-.4-3.4-1.2M12 5.5v13"/></svg>
+          </div>
+          <div><strong id="kpiValueToday">R$ 0,00</strong><span>Valor orçado hoje</span></div>
+        </div>
+        <button type="button" class="home-kpi home-kpi-clickable" onclick="mostrarServicosPendentesHome()" title="Ver serviços pendentes">
+          <div class="home-kpi-icon">
+            <svg viewBox="0 0 24 24"><path d="M9 4h6l1 3h3v13H5V7h3z"/><path d="M9 12l2 2 4-4"/></svg>
+          </div>
+          <div><strong id="kpiPendingServices">0</strong><span>Serviços pendentes</span></div>
+          <div class="home-kpi-arrow">›</div>
+        </button>
+      </div>
+
+    </div>
+
+    <div class="home-agenda">
+      <div class="home-agenda-toolbar">
+        <button type="button" onclick="formatarAgenda('bold')"><b>B</b></button>
+        <button type="button" onclick="formatarAgenda('italic')"><i>I</i></button>
+        <button type="button" onclick="formatarAgenda('underline')"><u>U</u></button>
+        <span></span>
+        <button type="button" onclick="formatarAgenda('justifyLeft')">☰</button>
+        <button type="button" onclick="formatarAgenda('formatBlock','H1')">H₁</button>
+        <button type="button" onclick="formatarAgenda('formatBlock','H2')">H₂</button>
+      </div>
+      <div id="homeAgenda" class="home-agenda-editor" contenteditable="true" oninput="salvarAgendaHome()">
+        <div style="text-align:center"><b><i>Agenda do dia!</i></b></div>
+      </div>
+    </div>
+
+    <div class="home-calendar">
+      <div class="calendar-head">
+        <button type="button" onclick="mudarMesHome(-1)">‹</button>
+        <strong id="homeCalendarTitle"></strong>
+        <button type="button" onclick="mudarMesHome(1)">›</button>
+      </div>
+      <div class="calendar-week">
+        <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+      </div>
+      <div id="homeCalendarDays" class="calendar-days"></div>
+    </div>
+  </section>
+
+  <section class="home-tasks-card">
+    <div class="home-tasks-head">
+      <div>
+        <h2>Lista de Tarefas</h2>
+        <p>Gerencie e acompanhe suas tarefas</p>
+      </div>
+      <button type="button" class="btn btn-light" onclick="abrirSeletorOrcamentosTarefas()">＋ Nova tarefa</button>
+    </div>
+    <div id="homeTasks" class="home-tasks-list"></div>
+  </section>
+</main>
+
+
+<div id="taskQuotePickerBackdrop" class="task-picker-backdrop" onclick="if(event.target===this)fecharSeletorOrcamentosTarefas()">
+  <div class="task-picker-modal">
+    <div class="task-picker-head">
+      <div>
+        <h2>Adicionar serviços à lista de tarefas</h2>
+        <p>Selecione um orçamento salvo e escolha os serviços que ainda precisam ser feitos.</p>
+      </div>
+      <button type="button" class="task-picker-close" onclick="fecharSeletorOrcamentosTarefas()">×</button>
+    </div>
+    <div class="task-picker-search-row">
+      <input id="taskQuoteSearch" placeholder="Pesquisar orçamento ou cliente..." oninput="renderOrcamentosParaTarefas()">
+    </div>
+    <div id="taskQuoteList" class="task-quote-list"></div>
+  </div>
+</div>
+
+
+<div id="pendingServicesBackdrop" class="pending-services-backdrop">
+  <div class="pending-services-modal">
+    <div class="pending-services-head">
+      <div>
+        <h2>Serviços Pendentes</h2>
+        <p>Serviços que ainda estão na sua lista de tarefas.</p>
+      </div>
+      <button type="button" class="pending-services-close" onclick="fecharServicosPendentesHome()">×</button>
+    </div>
+    <div id="pendingServicesList" class="pending-services-list"></div>
+  </div>
+</div>
+
+<main id="mainQuote" class="container">
+  <div class="page-heading">
+    <div class="page-heading-icon">
+      <svg viewBox="0 0 24 24"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v5h5"/><path d="M10 13h6M10 17h6"/></svg>
+    </div>
+    <div>
+      <h1>Novo Orçamento</h1>
+      <p>Crie e organize seu orçamento</p>
+    </div>
+  </div>
+  <div class="layout">
+    <div>
+      <section class="card client-card">
+        <h2 class="section-title">👤 Dados do Cliente</h2>
+        <div class="grid-2">
+<div class="field">
+            <div class="client-label-row">
+              <label for="cliente">Nome do Cliente</label>
+              <button type="button" class="saved-client-picker-btn saved-client-picker-btn-small" onclick="abrirClientesSalvos()" title="Clientes Salvos">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="9" cy="8" r="3"></circle>
+                  <path d="M3.5 19c.4-3.7 2.5-6 5.5-6s5.1 2.3 5.5 6"></path>
+                  <circle cx="17" cy="9" r="2.2"></circle>
+                  <path d="M15.5 14c2.8-.4 4.8 1.4 5 4"></path>
+                </svg>
+                <span>Clientes Salvos</span>
+              </button>
+            </div>
+            <div class="input-icon-wrap autocomplete-wrap">
+              <span class="field-icon">👤</span>
+              <input id="cliente" placeholder="Digite o nome do cliente" autocomplete="off" oninput="mostrarSugestoesClientes()" onfocus="mostrarSugestoesClientes()">
+              <div id="clientSuggestions" class="client-suggestions"></div>
+            </div>
+          </div>
+          <div class="field">
+            <div class="contact-label-spacer">
+              <label for="contato">Contato</label>
+            </div>
+            <div class="input-icon-wrap">
+              <span class="field-icon">📱</span>
+              <input id="contato" placeholder="Digite o contato (telefone, e-mail, etc.)">
+            </div>
+          </div>
+          <div class="field">
+            <label for="numeroOrcamento">Número do Orçamento</label>
+            <div class="input-icon-wrap">
+              <span class="field-icon">#</span>
+              <input id="numeroOrcamento" value="N-1" placeholder="Ex.: N-24">
+            </div>
+          </div>
+        </div>
+      
+        <div id="savedClientPicker" class="saved-client-picker">
+          <div class="saved-client-picker-head">
+            <div class="saved-client-picker-title">Clientes Salvos</div>
+            <input id="savedClientPickerSearch" class="saved-client-picker-search"
+                   placeholder="Pesquisar cliente..."
+                   oninput="renderClientesSalvosNoOrcamento()">
+            <button type="button" class="saved-client-picker-close" onclick="fecharClientesSalvos()">×</button>
+          </div>
+          <div id="savedClientPickerList" class="saved-client-picker-list"></div>
+        </div>
+</section>
+
+      <section class="card products-card">
+        <div class="products-head">
+          <h2>📦 Produtos do Orçamento</h2>
+          <button class="btn btn-primary no-print" onclick="abrirModal()">＋ DESCREVER PRODUTO</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Descrição do Produto</th>
+                <th>QTD.</th>
+                <th>Valor Unitário</th>
+                <th>Valor Total</th>
+                <th class="no-print">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="productRows">
+              <tr id="emptyRow"><td colspan="6">
+                <div class="empty">
+                  <div class="empty-icon">📦</div>
+                  <strong>Nenhum produto adicionado</strong><br>
+                  <span class="small-note">Clique em “DESCREVER PRODUTO” para adicionar itens ao orçamento.</span>
+                </div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <div class="summary-below-products">
+        <section class="card">
+        <h2 class="section-title">📄 Resumo do Orçamento</h2>
+        <div class="summary-row">
+          <span id="subtotalLabel">Subtotal (0 itens)</span>
+          <strong id="subtotal">R$ 0,00</strong>
+        </div>
+        <div class="summary-total">
+          <span>Total do Orçamento</span>
+          <strong id="grandTotal">R$ 0,00</strong>
+        </div>
+      </section>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL -->
+<div id="modalBackdrop" class="modal-backdrop" onclick="fecharSeFora(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Adicionar produto</h2>
+<div class="produto-modal-acoes-topo">
+<button type="button" class="btn saved-product-picker-btn" onclick="toggleProdutosSalvosNoModal()">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4z"/><path d="M4 7v10l8 4 8-4V7"/><path d="M12 11v10"/></svg>
+  <span>Produtos Salvos</span>
+</button>
+<button type="button" class="btn saved-product-picker-btn" onclick="abrirProdutoM2()">
+  <span>▦ Produto por Metro²</span>
+</button>
+<button type="button" class="btn saved-product-picker-btn material-analyzer-btn" onclick="abrirAnalisadorMateriais()">
+  <span>⌁ Analisar Materiais</span>
+</button>
+</div>
+      <button class="close" onclick="fecharModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-topline">
+        <label>Nome do Produto ou Serviço</label>
+      </div>
+
+      <input id="produtoBusca" placeholder="Pesquise pelo nome do produto...">
+<div class="price-grid">
+        <div class="field">
+          <label for="quantidade">Unidades</label>
+          <input id="quantidade" type="number" min="0" step="1" value="1" oninput="calcularModal()">
+        </div>
+
+        <div class="field">
+          <label for="custoProducao">Custo de Produção</label>
+          <div class="money-wrap">
+            <span class="money-prefix">R$</span>
+            <input id="custoProducao" type="number" min="0" step="0.01" value="0.00" oninput="calcularModal()">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="precoVenda">Preço de Venda</label>
+          <div class="money-wrap">
+            <span class="money-prefix">R$</span>
+            <input id="precoVenda" type="number" min="0" step="0.01" value="0.00" oninput="calcularModal()">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="custoTotal">Custo Total</label>
+          <div class="money-wrap">
+            <span class="money-prefix">R$</span>
+            <input id="custoTotal" type="text" value="0,00" readonly>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="precoVendaTotal">Preço de Venda Total</label>
+          <div class="money-wrap">
+            <span class="money-prefix">R$</span>
+            <input id="precoVendaTotal" type="text" value="0,00" readonly>
+          </div>
+        </div>
+      </div>
+
+      <div class="switch-row calc-toggle">
+        <label class="switch">
+          <input type="checkbox" id="disableCalc" onchange="calcularModal()">
+          <span class="slider"></span>
+        </label>
+        <span>Desativar cálculo de <strong>QTD × PREÇO</strong></span>
+      </div>
+
+      <div class="field" style="margin-top:20px">
+        <label for="observacoes">Observações</label>
+        <textarea id="observacoes" placeholder="Digite uma observação para aparecer no orçamento..." style="min-height:80px;resize:vertical"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-light" onclick="fecharModal()">Fechar</button>
+      <button class="btn btn-primary" onclick="adicionarProduto()">Adicionar ao Carrinho</button>
+    </div>
+  
+    <div id="savedProductPicker" class="saved-product-picker">
+      <div class="saved-product-picker-head">
+        <div class="saved-product-picker-title">Produtos Salvos</div>
+        <input id="savedProductPickerSearch" class="saved-product-picker-search"
+               placeholder="Pesquisar produto salvo..."
+               oninput="renderProdutosSalvosNoModal()">
+        <button type="button" class="saved-product-picker-close"
+                onclick="fecharProdutosSalvosNoModal()">×</button>
+      </div>
+      <div id="savedProductPickerList" class="saved-product-picker-list"></div>
+    </div>
+</div>
+</div>
+
+<script>
+let produtos = [];
+let acabamentosAtuais = [];
+
+function moeda(v){
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
+}
+function numeroBR(v){
+  return (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function abrirModal(){
+  document.getElementById('modalBackdrop').classList.add('show');
+  setTimeout(()=>document.getElementById('produtoBusca').focus(),50);
+}
+function fecharModal(){
+  document.getElementById('modalBackdrop').classList.remove('show');
+  limparModal();
+}
+function fecharSeFora(e){
+  if(e.target.id==='modalBackdrop') fecharModal();
+}
+function alternarManual(){
+  const ativo=document.getElementById('manualToggle').checked;
+  document.getElementById('manualArea').classList.toggle('show',ativo);
+  document.getElementById('produtoBusca').placeholder=ativo
+    ? 'Nome curto do produto ou serviço'
+    : 'Pesquise pelo nome do produto...';
+}
+function calcularModal(){
+  const qtd=Number(document.getElementById('quantidade').value)||0;
+  const custo=Number(document.getElementById('custoProducao').value)||0;
+  const venda=Number(document.getElementById('precoVenda').value)||0;
+  const desligado=document.getElementById('disableCalc').checked;
+
+  const custoTotal=desligado ? custo : qtd*custo;
+  const vendaTotal=desligado ? venda : qtd*venda;
+
+  document.getElementById('custoTotal').value=numeroBR(custoTotal);
+  document.getElementById('precoVendaTotal').value=numeroBR(vendaTotal);
+}
+function adicionarAcabamento(){
+  const input=document.getElementById('acabamentoInput');
+  const nome=input.value.trim();
+  if(!nome)return;
+  acabamentosAtuais.push(nome);
+  input.value='';
+  renderAcabamentos();
+}
+function renderAcabamentos(){
+  document.getElementById('acabamentosList').innerHTML=
+    acabamentosAtuais.map((a,i)=>`<span class="tag">${escapar(a)} <button onclick="removerAcabamento(${i})" style="border:0;background:transparent;color:#7c3aed;cursor:pointer">×</button></span>`).join('');
+}
+function removerAcabamento(i){
+  acabamentosAtuais.splice(i,1);
+  renderAcabamentos();
+}
+function adicionarProduto(){
+  const descricao=document.getElementById('produtoBusca').value.trim();
+  const qtd=Number(document.getElementById('quantidade').value)||0;
+  const custo=Number(document.getElementById('custoProducao').value)||0;
+  const venda=Number(document.getElementById('precoVenda').value)||0;
+  const desligado=document.getElementById('disableCalc').checked;
+
+  if(!descricao){alert('Informe o nome ou a descrição do produto.');return;}
+  if(qtd<=0){alert('Informe uma quantidade válida.');return;}
+
+  produtos.push({
+    id:Date.now(),
+    descricao,
+    qtd,
+    custo,
+    venda,
+    custoTotal:desligado?custo:qtd*custo,
+    total:desligado?venda:qtd*venda
+  });
+
+  renderProdutos();
+  fecharModal();
+}
+function renderProdutos(){
+  const tbody=document.getElementById('productRows');
+
+  if(produtos.length===0){
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty">
+      <div class="empty-icon">📦</div>
+      <strong>Nenhum produto adicionado</strong><br>
+      <span class="small-note">Clique em “DESCREVER PRODUTO” para adicionar itens ao orçamento.</span>
+    </div></td></tr>`;
+  }else{
+    tbody.innerHTML=produtos.map((p,i)=>`
+      <tr>
+        <td>${i+1}</td>
+        <td><strong>${escapar(p.descricao)}</strong></td>
+        <td>
+          <div class="cart-qty-control no-print">
+            <button type="button" onclick="alterarQuantidadeCarrinho(${p.id},-1)" aria-label="Diminuir quantidade">−</button>
+            <input type="number" min="1" step="1" value="${p.qtd}" onchange="definirQuantidadeCarrinho(${p.id},this.value)" aria-label="Quantidade">
+            <button type="button" onclick="alterarQuantidadeCarrinho(${p.id},1)" aria-label="Aumentar quantidade">+</button>
+          </div>
+          <span class="cart-qty-print">${p.qtd}</span>
+        </td>
+        <td>${moeda(p.venda)}</td>
+        <td><strong>${moeda(p.total)}</strong></td>
+        <td class="no-print"><button class="btn btn-danger" onclick="removerProduto(${p.id})">Excluir</button></td>
+      </tr>
+    `).join('');
+  }
+
+  const subtotal=produtos.reduce((s,p)=>s+p.total,0);
+  const total=subtotal;
+  document.getElementById('subtotal').textContent=moeda(subtotal);
+  document.getElementById('grandTotal').textContent=moeda(total);
+  document.getElementById('subtotalLabel').textContent=`Subtotal (${produtos.length} ${produtos.length===1?'item':'itens'})`;
+}
+function removerProduto(id){
+  produtos=produtos.filter(p=>p.id!==id);
+  renderProdutos();
+}
+function recalcularQuantidadeProduto(p,novaQtd){
+  const qtd=Math.max(1,Math.floor(Number(novaQtd)||1));
+  p.qtd=qtd;
+
+  // Produtos comuns: total acompanha QTD × preço unitário.
+  // Produtos por m²/cm² também preservam o valor unitário já calculado.
+  p.total=qtd*(Number(p.venda)||0);
+
+  // Mantém custo total coerente quando o item possuir custo.
+  if(Object.prototype.hasOwnProperty.call(p,'custo')){
+    p.custoTotal=qtd*(Number(p.custo)||0);
+  }
+}
+function definirQuantidadeCarrinho(id,valor){
+  const p=produtos.find(x=>Number(x.id)===Number(id));
+  if(!p)return;
+  recalcularQuantidadeProduto(p,valor);
+  renderProdutos();
+}
+function alterarQuantidadeCarrinho(id,delta){
+  const p=produtos.find(x=>Number(x.id)===Number(id));
+  if(!p)return;
+  recalcularQuantidadeProduto(p,(Number(p.qtd)||1)+Number(delta||0));
+  renderProdutos();
+}
+function limparModal(){
+  document.getElementById('produtoBusca').value='';
+  document.getElementById('produtoBusca').placeholder='Pesquise pelo nome do produto...';
+  document.getElementById('quantidade').value=1;
+  document.getElementById('custoProducao').value='0.00';
+  document.getElementById('precoVenda').value='0.00';
+  document.getElementById('disableCalc').checked=false;
+  calcularModal();
+}
+function escapar(t){
+  return String(t).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+function carregar(){
+  const salvo=localStorage.getItem('orcamentoAtualV2');
+  if(!salvo)return;
+  try{
+    const d=JSON.parse(salvo);
+    document.getElementById('cliente').value=d.cliente||'';
+    document.getElementById('contato').value=d.contato||'';
+    produtos=Array.isArray(d.produtos)?d.produtos:[];
+    renderProdutos();
+  }catch(e){}
+}
+
+function imprimirOrcamento(){
+  const cliente=(document.getElementById('cliente').value||'').trim() || 'Cliente não informado';
+  const contato=(document.getElementById('contato').value||'').trim() || '-';
+  const numero=(document.getElementById('numeroOrcamento').value||'').trim() || 'N-1';
+  const observacoes=(document.getElementById('observacoes').value||'').trim();
+  const subtotal=produtos.reduce((s,p)=>s+(Number(p.total)||0),0);
+
+  const logo=
+    document.querySelector('.brand-logo') ||
+    document.querySelector('.sidebar-avatar img');
+  if(logo && document.getElementById('pqLogo')) {
+    document.getElementById('pqLogo').src=logo.src;
+  }
+
+  document.getElementById('pqNumero').textContent='Orçamento '+numero;
+  const agora=new Date();
