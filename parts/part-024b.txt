@@ -1,0 +1,250 @@
+function salvarCfgLaser(cfg){localStorage.setItem(RPRINT_LASER_CFG_KEY,JSON.stringify(cfg))}
+function moedaLaser(v){return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function esconderLaser(){document.getElementById('laserPanel')?.classList.remove('show')}
+
+window.mostrarPrecificacaoLaser=function(){
+  const home=document.getElementById('homePanel');
+  const quote=document.getElementById('mainQuote');
+  if(home)home.style.display='none';
+  if(quote)quote.style.display='none';
+  ['savedPanel','pedidosPanel','clientsPanel','productsAdminPanel','backupPanel','dashboardFinanceiroPanel','pagamentosPanel','despesasPanel','minhaEmpresaPanel','materiaisPanel']
+    .forEach(id=>document.getElementById(id)?.classList.remove('show'));
+  document.getElementById('laserPanel')?.classList.add('show');
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('navLaser')?.classList.add('active');
+  aplicarCfgLaserNaCalculadora();
+  preencherMateriaisLaser();
+  preencherFitasLaser();
+  atualizarVisualFitaLaser();
+  atualizarTipoServicoLaser();
+  atualizarVisualTaxaMinimaLaser();
+  calcularLaser();
+};
+
+window.addEventListener('load',()=>{
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn=>{
+    if(btn.id!=='navLaser')btn.addEventListener('click',esconderLaser);
+  });
+});
+
+function aplicarCfgLaserNaCalculadora(){
+  const cfg=lerCfgLaser();
+  const taxa=document.getElementById('laserTaxaMinima');
+  if(taxa)taxa.value=Number(cfg.taxaMinima||15).toFixed(2);
+}
+
+function atualizarTipoServicoLaser(){
+  const tipo=document.getElementById('laserTipoServico').value;
+  const box=document.getElementById('laserTaxaMinimaBox');
+  const checkbox=document.getElementById('laserUsarTaxaMinima');
+  const taxa=document.getElementById('laserTaxaMinima');
+  const cfg=lerCfgLaser();
+
+  if(tipo==='pequeno'){
+    box.style.display='block';
+    if(taxa && (!taxa.value || Number(taxa.value)<=0)){
+      taxa.value=Number(cfg.taxaMinima||15).toFixed(2);
+    }
+    // Não força mais ligada; o usuário pode decidir.
+  }else if(tipo==='maior'){
+    box.style.display='none';
+    checkbox.checked=false;
+  }else{
+    box.style.display='block';
+  }
+
+  atualizarVisualTaxaMinimaLaser();
+}
+
+if(typeof laserPreparacaoAtiva==='undefined'){
+  window.laserPreparacaoAtiva=true;
+}
+
+function atualizarVisualTaxaMinimaLaser(){
+  const checkbox=document.getElementById('laserUsarTaxaMinima');
+  const btn=document.getElementById('laserTaxaMinimaToggleBtn');
+  const txt=document.getElementById('laserTaxaMinimaToggleTexto');
+  const input=document.getElementById('laserTaxaMinima');
+  const icon=btn?.querySelector('.laser-state-icon');
+  if(!checkbox||!btn||!txt||!input)return;
+  const ativa=checkbox.checked;
+  btn.classList.toggle('active',ativa);
+  txt.textContent=ativa?'Taxa mínima ativada':'Taxa mínima desativada';
+  if(icon)icon.textContent=ativa?'✓':'×';
+  input.disabled=!ativa;
+}
+function alternarTaxaMinimaLaser(){
+  const checkbox=document.getElementById('laserUsarTaxaMinima');
+  if(!checkbox)return;
+  checkbox.checked=!checkbox.checked;
+  atualizarVisualTaxaMinimaLaser();
+  calcularLaser();
+}
+function atualizarVisualPreparacaoLaser(){
+  const btn=document.getElementById('laserPreparacaoToggleBtn');
+  const input=document.getElementById('laserPreparacaoMin');
+  const txt=document.getElementById('laserPreparacaoToggleTexto');
+  const icon=btn?.querySelector('.laser-state-icon');
+  if(btn)btn.classList.toggle('active',!!window.laserPreparacaoAtiva);
+  if(txt)txt.textContent=window.laserPreparacaoAtiva?'Preparação ativada':'Preparação desativada';
+  if(icon)icon.textContent=window.laserPreparacaoAtiva?'✓':'×';
+  if(input)input.disabled=!window.laserPreparacaoAtiva;
+}
+function alternarPreparacaoLaser(){
+  window.laserPreparacaoAtiva=!window.laserPreparacaoAtiva;
+  atualizarVisualPreparacaoLaser();
+  calcularLaser();
+}
+
+function calcularLaser(){
+  const cfg=lerCfgLaser();
+  const qtd=Math.max(1,Math.floor(Number(document.getElementById('laserQuantidade')?.value)||1));
+  const tempoPeca=Math.max(0,Number(document.getElementById('laserTempoPeca')?.value)||0);
+  const preparacao=window.laserPreparacaoAtiva!==false ? Math.max(0,Number(document.getElementById('laserPreparacaoMin')?.value)||0) : 0;
+  const materialPeca=Math.max(0,Number(document.getElementById('laserMaterialPeca')?.value)||0);
+  const adicionalPeca=Math.max(0,Number(document.getElementById('laserAdicionalPeca')?.value)||0);
+  const maoObra=Math.max(0,Number(document.getElementById('laserMaoObra')?.value)||0);
+  const margem=Math.max(0,Number(document.getElementById('laserMargem')?.value)||0);
+  const tempoTotal=preparacao+(tempoPeca*qtd);
+  const custoMaquina=tempoTotal*(Number(cfg.valorMinuto)||0);
+  const custoFitaPorPeca=laserFitaEstado?.ativa ? (Number(laserFitaEstado.custo)||0) : 0;
+  const extras=(materialPeca+adicionalPeca+custoFitaPorPeca)*qtd+maoObra;
+  const custoTotal=custoMaquina+extras;
+  const precoCalculado=custoTotal*(1+margem/100);
+  const usarMinima=!!document.getElementById('laserUsarTaxaMinima')?.checked;
+  const taxaMinima=Math.max(0,Number(document.getElementById('laserTaxaMinima')?.value)||0);
+  const precoSugerido=usarMinima?Math.max(precoCalculado,taxaMinima):precoCalculado;
+  const aplicada=usarMinima && precoCalculado<taxaMinima;
+
+  document.getElementById('laserTempoTotal').textContent=tempoTotal.toLocaleString('pt-BR',{maximumFractionDigits:1})+' min';
+  document.getElementById('laserCustoMaquina').textContent=moedaLaser(custoMaquina);
+  document.getElementById('laserCustosExtras').textContent=moedaLaser(extras);
+  document.getElementById('laserCustoTotal').textContent=moedaLaser(custoTotal);
+  document.getElementById('laserPrecoCalculado').textContent=moedaLaser(precoCalculado);
+  document.getElementById('laserPrecoSugerido').textContent=moedaLaser(precoSugerido);
+  document.getElementById('laserPrecoUnidade').textContent=moedaLaser(precoSugerido/qtd);
+  document.getElementById('laserTaxaAplicadaAviso')?.classList.toggle('show',aplicada);
+  return {qtd,tempoTotal,custoMaquina,extras,custoTotal,precoCalculado,precoSugerido};
+}
+
+
+function fmtTempoSvgLaser(seg){
+  seg=Math.max(0,Math.round(Number(seg)||0));
+  const h=Math.floor(seg/3600),m=Math.floor((seg%3600)/60),s=seg%60;
+  return h?`${h}h ${m}min ${s}s`:m?`${m}min ${s}s`:`${s}s`;
+}
+function parseLenSvgLaser(t){
+  const m=String(t||'').trim().match(/^([+-]?(?:\d+\.?\d*|\.\d+))\s*(mm|cm|in|pt|pc|m|px)?$/i);
+  return m?{v:Number(m[1]),u:(m[2]||'px').toLowerCase()}:null;
+}
+function toMmSvgLaser(v,u){
+  return u==='mm'?v:u==='cm'?v*10:u==='in'?v*25.4:u==='pt'?v*25.4/72:u==='pc'?v*25.4/6:u==='m'?v*1000:null;
+}
+
+function fmtTempoSvgLaser(seg){
+  seg=Math.max(0,Math.round(Number(seg)||0));
+  const h=Math.floor(seg/3600),m=Math.floor((seg%3600)/60),s=seg%60;
+  return h?`${h}h ${m}min ${s}s`:m?`${m}min ${s}s`:`${s}s`;
+}
+function parseLenSvgLaser(t){
+  const m=String(t||'').trim().match(/^([+-]?(?:\d+\.?\d*|\.\d+))\s*(mm|cm|in|pt|pc|m|px)?$/i);
+  return m?{v:Number(m[1]),u:(m[2]||'px').toLowerCase()}:null;
+}
+function toMmSvgLaser(v,u){
+  return u==='mm'?v:u==='cm'?v*10:u==='in'?v*25.4:u==='pt'?v*25.4/72:u==='pc'?v*25.4/6:u==='m'?v*1000:null;
+}
+function normalizarCorLaser(c){
+  c=String(c||'').trim().toLowerCase().replace(/\s+/g,'');
+  if(!c || c==='none' || c==='transparent' || c==='rgba(0,0,0,0)')return '';
+
+  // nomes básicos
+  if(c==='black')return 'black';
+  if(c==='red')return 'red';
+
+  // HEX: #RGB, #RRGGBB e #RRGGBBAA
+  if(/^#[0-9a-f]{3}$/i.test(c)){
+    const r=parseInt(c[1]+c[1],16), g=parseInt(c[2]+c[2],16), b=parseInt(c[3]+c[3],16);
+    return classificarRgbLaser(r,g,b,c);
+  }
+  if(/^#[0-9a-f]{6,8}$/i.test(c)){
+    const r=parseInt(c.slice(1,3),16), g=parseInt(c.slice(3,5),16), b=parseInt(c.slice(5,7),16);
+    return classificarRgbLaser(r,g,b,c);
+  }
+
+  // rgb/rgba com valores absolutos
+  let m=c.match(/^rgba?\(([\d.]+),([\d.]+),([\d.]+)/);
+  if(m){
+    return classificarRgbLaser(Number(m[1]),Number(m[2]),Number(m[3]),c);
+  }
+
+  // rgb em porcentagem
+  m=c.match(/^rgba?\(([\d.]+)%,([\d.]+)%,([\d.]+)%/);
+  if(m){
+    return classificarRgbLaser(
+      Number(m[1])*2.55,
+      Number(m[2])*2.55,
+      Number(m[3])*2.55,
+      c
+    );
+  }
+
+  return c;
+}
+
+function classificarRgbLaser(r,g,b,original){
+  r=Number(r)||0; g=Number(g)||0; b=Number(b)||0;
+
+  // preto e tons praticamente pretos
+  if(r<=35 && g<=35 && b<=35)return 'black';
+
+  // aceita vermelho puro e também vermelhos comuns exportados pelo Corel/Illustrator,
+  // como #E31E24, #ED1C24, #D91E18 etc.
+  if(
+    r>=150 &&
+    r>=g*1.55 &&
+    r>=b*1.55 &&
+    g<=120 &&
+    b<=120
+  ){
+    return 'red';
+  }
+
+  return original;
+}
+function svgColorLaser(el){
+  // Com o SVG inserido temporariamente no DOM, getComputedStyle resolve:
+  // classes CSS, estilos herdados de grupos <g> e cores padrão do SVG.
+  let cs=null;
+  try{cs=getComputedStyle(el)}catch(e){}
+  const fill=normalizarCorLaser(cs?.fill || el.getAttribute('fill'));
+  const stroke=normalizarCorLaser(cs?.stroke || el.getAttribute('stroke'));
+  return {fill,stroke};
+}
+function fatorEscalaElementoLaser(el){
+  try{
+    const m=el.getCTM();
+    if(!m)return {sx:1,sy:1};
+    return {
+      sx:Math.hypot(m.a,m.b)||1,
+      sy:Math.hypot(m.c,m.d)||1
+    };
+  }catch(e){return {sx:1,sy:1}}
+}
+function svgLineLenLaser(el){
+  const tag=el.tagName.toLowerCase(),n=a=>Number(el.getAttribute(a))||0;
+  let len=0;
+  try{
+    if(typeof el.getTotalLength==='function' && ['path','line','polyline','polygon','rect','circle','ellipse'].includes(tag)){
+      len=Number(el.getTotalLength())||0;
+    }
+  }catch(e){}
+  if(!len){
+    if(tag==='line')len=Math.hypot(n('x2')-n('x1'),n('y2')-n('y1'));
+    else if(tag==='rect')len=2*(Math.abs(n('width'))+Math.abs(n('height')));
+    else if(tag==='circle')len=2*Math.PI*n('r');
+    else if(tag==='ellipse'){
+      const a=n('rx'),b=n('ry');
+      len=Math.PI*(3*(a+b)-Math.sqrt(Math.max(0,(3*a+b)*(a+3*b))));
+    }
+  }
+  const f=fatorEscalaElementoLaser(el);
