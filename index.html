@@ -2,8 +2,16 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f2b3d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>R-Print</title>
+<!-- versão móvel/PWA 2026-10-02 -->
 <style>
 html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f7f8fb;color:#172033}
 #boot{height:100%;display:grid;place-items:center;text-align:center;padding:24px;box-sizing:border-box}
@@ -16,6 +24,9 @@ html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f7f8fb;c
 <body>
 <div id="boot"><div><div class="loader"></div><strong>R-Print</strong><span>Carregando sistema...</span></div></div>
 <script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+}
 const parts=["parts/part-000.txt","parts/part-001.txt","parts/part-002.txt","parts/part-003.txt","parts/part-004.txt","parts/part-005.txt","parts/part-006.txt","parts/part-007.txt","parts/part-008.txt","parts/part-009.txt","parts/part-010a.txt","parts/part-010b.txt","parts/part-011.txt","parts/part-012.txt","parts/part-013.txt","parts/part-014.txt","parts/part-015.txt","parts/part-016.txt","parts/part-017.txt","parts/part-018.txt","parts/part-019.txt","parts/part-020a.txt","parts/part-020b.txt","parts/part-021.txt","parts/part-022.txt","parts/part-023.txt","parts/part-024a.txt","parts/part-024b.txt","parts/part-025.txt","parts/part-026.txt"];
 (async()=>{
   try{
