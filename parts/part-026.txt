@@ -1,0 +1,106 @@
+  document.getElementById('laserTaxaMinima').value=cfg.taxaMinima.toFixed(2);
+  fecharConfiguracaoLaser();
+  calcularLaser();
+}
+function limparCalculadoraLaser(){
+  document.getElementById('laserTipoServico').value='pequeno';
+  document.getElementById('laserOperacao').value='Corte';
+  document.getElementById('laserDescricao').value='';
+  document.getElementById('laserQuantidade').value=1;
+  document.getElementById('laserTempoPeca').value=1;
+  document.getElementById('laserPreparacaoMin').value=5;
+  document.getElementById('laserMaterialPeca').value=0;
+  const matSel=document.getElementById('laserMaterialSelecionado');
+  if(matSel)matSel.value='';
+  laserSvgMaterialMedidas={larguraMm:0,alturaMm:0,areaM2:0,arquivo:''};
+  laserFitaEstado={ativa:false,areaBaseM2:0,comprimentoCorteM:0,metros:0,custo:0,marcadores:0,pecasEstimadas:0,larguraMarcadorMm:0,alturaMarcadorMm:0,comprimentoPecaMm:0,referenciaArea:0,areaTotalVermelha:0};
+  const fitaChk=document.getElementById('laserFitaAtiva');
+  if(fitaChk)fitaChk.checked=false;
+  atualizarVisualFitaLaser();
+  const fitaSel=document.getElementById('laserFitaMaterial');
+  if(fitaSel)fitaSel.value='';
+  const tamEl=document.getElementById('laserSvgTamanhoMaterial');
+  const areaEl=document.getElementById('laserSvgAreaMaterial');
+  const custoMatEl=document.getElementById('laserSvgCustoMaterial');
+  const apEl=document.getElementById('laserSvgAproveitamentoChapa');
+  if(tamEl)tamEl.textContent='0,00 × 0,00 cm';
+  if(areaEl)areaEl.textContent='0,0000 m²';
+  if(custoMatEl)custoMatEl.textContent='R$ 0,00';
+  if(apEl)apEl.textContent='—';
+  document.getElementById('laserAdicionalPeca').value=0;
+  document.getElementById('laserMaoObra').value=0;
+  document.getElementById('laserMargem').value=50;
+  laserPreparacaoAtiva=true;
+  const prepBtn=document.getElementById('laserPreparacaoToggleBtn');
+  const prepInput=document.getElementById('laserPreparacaoMin');
+  if(prepBtn){prepBtn.classList.add('active');prepBtn.textContent='Ativada'}
+  if(prepInput)prepInput.disabled=false;
+  document.getElementById('laserUsarTaxaMinima').checked=true;
+  atualizarTipoServicoLaser();
+  atualizarVisualTaxaMinimaLaser();
+  calcularLaser();
+}
+function adicionarLaserAoOrcamento(){
+  const r=calcularLaser();
+  const desc=(document.getElementById('laserDescricao').value||'').trim() || `${document.getElementById('laserOperacao').value} a Laser`;
+  if(typeof produtos==='undefined'){alert('Não foi possível acessar o orçamento atual.');return}
+  produtos.push({
+    id:Date.now(),
+    descricao:desc,
+    qtd:r.qtd,
+    custo:r.custoTotal/r.qtd,
+    venda:r.precoSugerido/r.qtd,
+    custoTotal:r.custoTotal,
+    total:r.precoSugerido,
+    origemLaser:true,
+    materialLaser:(()=>{
+      const sel=document.getElementById('laserMaterialSelecionado');
+      const m=typeof lerMateriais==='function'?lerMateriais().find(x=>String(x.id)===String(sel?.value)):null;
+      return m?m.nome:'';
+    })(),
+    materialAreaM2:Number(laserSvgMaterialMedidas.areaM2)||0,
+    fitaDuplaFaceAtiva:!!laserFitaEstado.ativa,
+    fitaDuplaFaceMetros:Number(laserFitaEstado.metros)||0,
+    fitaDuplaFaceCusto:Number(laserFitaEstado.custo)||0,
+    fitaDuplaFacePecas:Number(laserFitaEstado.pecasEstimadas)||0,
+    fitaDuplaFacePecaMm:Number(laserFitaEstado.comprimentoPecaMm)||0
+  });
+  if(typeof renderProdutos==='function')renderProdutos();
+  if(typeof mostrarNovoOrcamento==='function')mostrarNovoOrcamento();
+}
+</script>
+
+
+<script>
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    atualizarVisualTaxaMinimaLaser();
+    atualizarVisualPreparacaoLaser();
+  },50);
+});
+</script>
+
+<script>
+window.addEventListener('load',()=>{
+  setTimeout(()=>{
+    try{garantirDespesasRecorrentesProximas()}catch(e){console.warn(e)}
+  },120);
+});
+</script>
+
+
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  const actions=document.getElementById('orcamentoTopActions');
+  if(actions)actions.classList.remove('rprint-show');
+
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      mostrarAcoesOrcamentoTopbar(btn.id==='navNovo');
+    });
+  });
+});
+</script>
+
+</body>
+</html>
