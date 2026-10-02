@@ -1,0 +1,500 @@
+
+.sidebar-footer .local-user-avatar img.show{
+  display:block!important;
+}
+
+.sidebar-footer .local-user-avatar img.show + .local-user-avatar-fallback,
+.sidebar-footer .local-user-avatar-fallback.hide{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+  pointer-events:none!important;
+}
+
+.sidebar-footer .local-user-avatar-fallback{
+  position:absolute!important;
+  inset:0!important;
+  z-index:1!important;
+  border-radius:50%!important;
+}
+
+/* Foto maior da janela de perfil */
+.local-user-profile-photo{
+  width:92px!important;
+  height:92px!important;
+  min-width:92px!important;
+  min-height:92px!important;
+  aspect-ratio:1 / 1!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+}
+.local-user-profile-photo img{
+  width:92px!important;
+  height:92px!important;
+  min-width:92px!important;
+  min-height:92px!important;
+  max-width:92px!important;
+  max-height:92px!important;
+  aspect-ratio:1 / 1!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  border-radius:50%!important;
+  z-index:2!important;
+}
+.local-user-profile-photo img.show + .local-user-profile-fallback,
+.local-user-profile-fallback.hide{
+  display:none!important;
+  visibility:hidden!important;
+  opacity:0!important;
+}
+</style>
+
+
+<style>
+/* ===== CORREÇÃO DEFINITIVA DO OVAL ATRÁS DA FOTO ===== */
+.sidebar-footer .user-profile-button,
+.sidebar-footer button.user-profile-button,
+.sidebar-footer .local-user-line.user-profile-button{
+  background:transparent!important;
+  background-color:transparent!important;
+  background-image:none!important;
+  border:0!important;
+  box-shadow:none!important;
+  outline:0!important;
+  border-radius:0!important;
+  padding-left:10px!important;
+}
+
+.sidebar-footer .user-profile-button:hover,
+.sidebar-footer .user-profile-button:focus,
+.sidebar-footer .user-profile-button:active{
+  background:transparent!important;
+  background-color:transparent!important;
+  background-image:none!important;
+  box-shadow:none!important;
+}
+
+.sidebar-footer .user-profile-button::before,
+.sidebar-footer .user-profile-button::after,
+.sidebar-footer .local-user-avatar::before,
+.sidebar-footer .local-user-avatar::after{
+  content:none!important;
+  display:none!important;
+  background:none!important;
+}
+
+.sidebar-footer .local-user-avatar{
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  flex:0 0 28px!important;
+  aspect-ratio:1!important;
+  border-radius:999px!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  overflow:hidden!important;
+}
+
+.sidebar-footer .local-user-avatar img{
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  max-width:28px!important;
+  min-height:28px!important;
+  max-height:28px!important;
+  border-radius:999px!important;
+  object-fit:cover!important;
+  display:block!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.sidebar-footer .local-user-avatar img.show ~ .local-user-avatar-fallback{
+  display:none!important;
+}
+
+/* mantém apenas um pequeno destaque circular ao passar o mouse */
+.sidebar-footer .user-profile-button:hover .local-user-avatar{
+  box-shadow:0 0 0 2px rgba(232,90,168,.20)!important;
+}
+</style>
+
+
+<style>
+/* ===== AVATAR CIRCULAR - CORREÇÃO DA CAIXA EXTERNA ===== */
+#localCurrentUserPhoto,
+#localCurrentUserFallback,
+.sidebar .local-user-avatar,
+.sidebar-footer .local-user-avatar,
+.user-profile-button .local-user-avatar{
+  box-sizing:border-box!important;
+}
+
+.sidebar .user-profile-button .local-user-avatar,
+.sidebar-footer .user-profile-button .local-user-avatar{
+  display:inline-flex!important;
+  position:relative!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  flex:0 0 28px!important;
+  flex-grow:0!important;
+  flex-shrink:0!important;
+  padding:0!important;
+  margin:0!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+.sidebar .user-profile-button .local-user-avatar img,
+.sidebar-footer .user-profile-button .local-user-avatar img,
+#localCurrentUserPhoto{
+  position:absolute!important;
+  inset:0!important;
+  display:block!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:50%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  transform:none!important;
+}
+
+#localCurrentUserFallback{
+  position:absolute!important;
+  inset:0!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  border-radius:50%!important;
+}
+
+#localCurrentUserPhoto.show ~ #localCurrentUserFallback,
+#localCurrentUserFallback.hide{
+  display:none!important;
+}
+
+/* Nenhum fundo deve envolver a foto quando o mouse passa por cima */
+.sidebar-footer .user-profile-button:hover .local-user-avatar,
+.sidebar-footer .user-profile-button:focus .local-user-avatar,
+.sidebar-footer .user-profile-button:active .local-user-avatar{
+  width:28px!important;
+  height:28px!important;
+  max-width:28px!important;
+  border-radius:50%!important;
+  background:transparent!important;
+  box-shadow:0 0 0 2px rgba(232,90,168,.25)!important;
+}
+</style>
+
+
+<style>
+/* ===== PERFIL DO USUÁRIO SEM FUNDO OVAL ===== */
+
+/* A linha inteira deixa de ser botão. */
+.sidebar-footer .user-profile-row{
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+  outline:0!important;
+  border-radius:0!important;
+}
+
+/* Somente a foto é clicável. */
+.sidebar-footer .local-user-avatar-button{
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  flex:0 0 28px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  outline:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  border-radius:50%!important;
+  display:block!important;
+  cursor:pointer!important;
+  overflow:visible!important;
+}
+
+.sidebar-footer .local-user-avatar-button:hover,
+.sidebar-footer .local-user-avatar-button:focus,
+.sidebar-footer .local-user-avatar-button:active{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Caixa da foto: sempre quadrada e circular. */
+.sidebar-footer .local-user-avatar{
+  display:block!important;
+  position:relative!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  flex:none!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:50%!important;
+  overflow:hidden!important;
+  background:#2b3a50!important;
+  box-shadow:none!important;
+}
+
+/* Foto ocupa exatamente o círculo. */
+.sidebar-footer #localCurrentUserPhoto{
+  position:absolute!important;
+  inset:0!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  border:0!important;
+  border-radius:50%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  margin:0!important;
+  padding:0!important;
+  box-shadow:none!important;
+}
+
+/* Ícone padrão só aparece quando não há foto. */
+.sidebar-footer #localCurrentUserFallback{
+  position:absolute!important;
+  inset:0!important;
+  width:28px!important;
+  height:28px!important;
+  min-width:28px!important;
+  min-height:28px!important;
+  max-width:28px!important;
+  max-height:28px!important;
+  border-radius:50%!important;
+  display:grid;
+  place-items:center;
+}
+
+.sidebar-footer #localCurrentUserPhoto.show ~ #localCurrentUserFallback,
+.sidebar-footer #localCurrentUserFallback.hide{
+  display:none!important;
+}
+
+/* Destaque do hover é um círculo, não uma cápsula. */
+.sidebar-footer .local-user-avatar-button:hover .local-user-avatar{
+  box-shadow:0 0 0 2px rgba(232,90,168,.35)!important;
+}
+
+/* Remove qualquer estilo antigo aplicado ao botão de perfil. */
+.sidebar-footer .user-profile-button{
+  all:unset!important;
+}
+</style>
+
+
+<style>
+/* ===== MAIS RESPIRO ENTRE A MARCA E OS ITENS DO MENU ===== */
+/* Afasta levemente o primeiro bloco de navegação da logo/nome da empresa,
+   sem alterar o espaçamento entre os demais itens. */
+.sidebar-nav{
+  padding-top:14px!important;
+}
+</style>
+
+
+<style>
+/* ===== TOPO DO MENU LATERAL UM POUCO MAIS ESCURO ===== */
+/* Escurece somente a área da logomarca e do nome da empresa. */
+.sidebar-brand,
+.sidebar-header,
+.sidebar-top{
+  background-color:#182537!important;
+}
+
+/* Mantém a separação discreta entre a marca e a navegação. */
+.sidebar-brand,
+.sidebar-header{
+  border-bottom-color:rgba(255,255,255,.06)!important;
+}
+</style>
+
+
+<style>
+/* ===== NOME DA EMPRESA EM NEGRITO ===== */
+.sidebar-brand [data-company-menu-name],
+.sidebar-header [data-company-menu-name],
+.sidebar-top [data-company-menu-name]{
+  font-weight:800!important;
+}
+</style>
+
+
+<style>
+/* ===== ALERTA DE DESPESAS NA DASHBOARD ===== */
+.finance-alert-card{
+  cursor:pointer!important;
+  border-color:#f2d59b!important;
+  background:linear-gradient(135deg,#fffdf7,#fff8e8)!important;
+}
+.finance-alert-card.has-alert{
+  border-color:#efb94d!important;
+  box-shadow:0 4px 14px rgba(239,185,77,.14)!important;
+}
+.finance-alert-card small{
+  display:block;
+  margin-top:3px;
+  color:#8a6a2d;
+  font-size:9.5px;
+  line-height:1.25;
+}
+.finance-alert-icon{
+  background:#fff3cf!important;
+  color:#d68a00!important;
+}
+.finance-alert-card.has-alert .finance-alert-icon{
+  animation:rprintAlertBlink 1.05s ease-in-out infinite;
+}
+@keyframes rprintAlertBlink{
+  0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(232,90,168,0)}
+  50%{transform:scale(1.08);box-shadow:0 0 0 6px rgba(232,90,168,.12)}
+}
+
+.finance-alert-modal{
+  width:min(620px,100%)!important;
+}
+.finance-alert-list{
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+.finance-alert-item{
+  border:1px solid #e4e7ee;
+  border-radius:10px;
+  padding:11px 12px;
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:12px;
+  align-items:center;
+}
+.finance-alert-item.today{
+  border-color:#efb94d;
+  background:#fff8e8;
+}
+.finance-alert-item.tomorrow{
+  border-color:#f2cf7e;
+  background:#fffbf2;
+}
+.finance-alert-item strong{
+  display:block;
+  color:#263142;
+  font-size:12px;
+}
+.finance-alert-item small{
+  display:block;
+  margin-top:3px;
+  color:#7c8798;
+  font-size:10px;
+}
+.finance-alert-days{
+  min-width:88px;
+  text-align:center;
+  border-radius:999px;
+  padding:6px 9px;
+  background:#f3efff;
+  color:#6d3fc0;
+  font-size:9.5px;
+  font-weight:800;
+}
+.finance-alert-item.today .finance-alert-days{
+  background:#fff0c7;
+  color:#a15c00;
+}
+.finance-alert-empty{
+  text-align:center;
+  color:#98a2b3;
+  padding:28px 10px;
+  font-size:11.5px;
+}
+</style>
+
+
+<style>
+/* ===== ALERTA ATIVO EM VERMELHO ===== */
+.finance-alert-card.has-alert .finance-alert-icon{
+  background:#fee2e2!important;
+  color:#dc2626!important;
+  animation:rprintAlertBlinkRed 1.05s ease-in-out infinite!important;
+}
+.finance-alert-card.has-alert{
+  border-color:#f3a6a6!important;
+}
+@keyframes rprintAlertBlinkRed{
+  0%,100%{
+    transform:scale(1);
+    box-shadow:0 0 0 0 rgba(220,38,38,0);
+  }
+  50%{
+    transform:scale(1.08);
+    box-shadow:0 0 0 7px rgba(220,38,38,.16);
+  }
+}
+</style>
+
+
+<style>
+/* ===== ALERTA VERMELHO: AUMENTA MAIS DURANTE A PISCADA ===== */
+.finance-alert-card.has-alert .finance-alert-icon{
+  animation:rprintAlertBlinkRedBig 1.05s ease-in-out infinite!important;
+}
+@keyframes rprintAlertBlinkRedBig{
+  0%,100%{
+    transform:scale(1);
+    box-shadow:0 0 0 0 rgba(220,38,38,0);
+  }
+  50%{
+    transform:scale(1.18);
+    box-shadow:0 0 0 8px rgba(220,38,38,.17);
+  }
+}
+</style>
+
+
+<style>
+/* ===== DATA DE ENTREGA DOS PEDIDOS ===== */
+.pedido-entrega-input{
+  width:100%!important;
+  min-height:32px!important;
+  border:1px solid #dfe3ea!important;
+  border-radius:7px!important;
+  background:#fff!important;
+  padding:5px 6px!important;
+  color:#475467!important;
+  font-family:inherit!important;
