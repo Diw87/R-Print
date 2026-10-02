@@ -1,0 +1,250 @@
+  pedidos.sort((a,b)=>String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
+
+  const total=pedidos.length;
+  const q=(document.getElementById('pedidosSearch')?.value||'').trim().toLowerCase();
+  const filtro=document.getElementById('pedidosFiltroStatus')?.value||'';
+
+  if(q){
+    pedidos=pedidos.filter(p=>
+      String(p.numero||'').toLowerCase().includes(q) ||
+      String(p.cliente||'').toLowerCase().includes(q) ||
+      String(p.contato||'').toLowerCase().includes(q)
+    );
+  }
+  if(filtro){
+    pedidos=pedidos.filter(p=>p.status===filtro);
+  }
+
+  const badge=document.getElementById('pedidosCount');
+  if(badge) badge.textContent=`${total} ${total===1?'pedido':'pedidos'}`;
+
+  if(!pedidos.length){
+    list.innerHTML='<div class="pedido-empty">Nenhum pedido encontrado.</div>';
+    return;
+  }
+
+  const pagina=paginarLista(pedidos,'pedidos');
+
+  list.innerHTML=`
+    <div class="pedido-row header">
+      <div>Número</div>
+      <div>Cliente</div>
+      <div>Data</div>
+      <div>Total</div>
+      <div>Status</div>
+      <div>Entrega</div>
+      <div style="text-align:right">Ações</div>
+    </div>`+
+    pagina.itens.map(p=>{
+      const data=p.criadoEm
+        ? new Date(p.criadoEm).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})
+        : '-';
+
+      return `<div class="pedido-row">
+        <div><strong>${escapar(p.numero||'-')}</strong></div>
+        <div class="pedido-client">
+          <strong>${escapar(p.cliente||'Cliente não informado')}</strong>
+          <small>${escapar(p.contato||'')}</small>
+        </div>
+        <div>${data}</div>
+        <div><strong>${moeda(p.total||0)}</strong></div>
+        <div>
+          <select class="pedido-status-select ${classeStatusPedidoCor(p.status)}" onchange="atualizarStatusPedido(${p.id},this.value);this.className='pedido-status-select '+classeStatusPedidoCor(this.value)">
+            ${['Aguardando','Em Produção','Pronto','Entregue'].map(s=>`<option value="${s}" ${p.status===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <input class="pedido-entrega-input" type="date" value="${p.dataEntrega||''}" onchange="atualizarDataEntregaPedido(${p.id},this.value)" title="Data prevista de entrega">
+        </div>
+        <div class="pedido-actions">
+          <button class="btn btn-secondary" onclick="abrirPdfPedido(${p.id})">
+            <svg class="pedido-pdf-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 3h7l4 4v14H7z"></path>
+              <path d="M14 3v5h5"></path>
+              <path d="M9.5 13h5M9.5 17h5"></path>
+            </svg>
+            Abrir PDF
+          </button>
+          <button class="btn btn-danger" onclick="excluirPedido(${p.id})">Excluir</button>
+        </div>
+      </div>`;
+    }).join('')+htmlPaginacaoLista('pedidos',pagina,'renderizarPedidos');
+}
+
+/* Substitui a renderização da lista de orçamentos para incluir o botão Aprovar. */
+window.renderizarHistorico=async function(){
+  const list=document.getElementById('savedList');
+  if(!list)return;
+
+  let itens=await dbGetAll();
+  itens.sort((a,b)=>String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||'')));
+
+  const pedidos=lerPedidosLocal();
+  const idsPedidos=new Set(pedidos.map(p=>Number(p.orcamentoId)));
+
+  const totalSalvos=itens.length;
+  const q=(document.getElementById('historySearch')?.value||'').trim().toLowerCase();
+
+  if(q){
+    itens=itens.filter(x=>
+      String(x.numero||'').toLowerCase().includes(q) ||
+      String(x.cliente||'').toLowerCase().includes(q) ||
+      String(x.contato||'').toLowerCase().includes(q)
+    );
+  }
+
+  const count=document.getElementById('historyCount');
+  if(count) count.textContent=`${totalSalvos} ${totalSalvos===1?'orçamento':'orçamentos'}`;
+
+  if(!itens.length){
+    list.innerHTML='<div class="empty-history">Nenhum orçamento salvo ainda.</div>';
+    return;
+  }
+
+  const pagina=paginarLista(itens,'orcamentos');
+
+  list.innerHTML=`
+    <div class="saved-row header">
+      <div>Número</div><div>Cliente</div><div>Atualizado</div><div>Total</div><div style="text-align:right">Ações</div>
+    </div>`+
+    pagina.itens.map(x=>{
+      const data=x.atualizadoEm
+        ? new Date(x.atualizadoEm).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})
+        : '-';
+
+      const aprovado=idsPedidos.has(Number(x.id)) || x.aprovado===true;
+
+      return `<div class="saved-row">
+        <div>
+          <strong>${escapar(x.numero||'-')}</strong>
+          ${aprovado?'<span class="orcamento-aprovado-badge">Aprovado</span>':''}
+        </div>
+        <div class="saved-client">
+          <strong>${escapar(x.cliente||'Cliente não informado')}</strong>
+          <small>${escapar(x.contato||'')}</small>
+        </div>
+        <div>${data}</div>
+        <div><strong>${moeda(x.total||0)}</strong></div>
+        <div class="saved-actions saved-actions-modern">
+          <button class="saved-action-btn action-preview" onclick="visualizarPdfOrcamentoSalvo(${x.id})" title="Visualizar PDF">
+            <span class="saved-action-icon">
+              <svg viewBox="0 0 24 24">
+                <path d="M4 5h16v14H4z"></path>
+                <path d="M8 9h8M8 13h8M8 17h5"></path>
+              </svg>
+            </span>
+            <span>PDF</span>
+          </button>
+
+          <button class="saved-action-btn action-edit" onclick="editarOrcamentoSalvo(${x.id})" title="Editar orçamento">
+            <span class="saved-action-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 20l4.2-1 10-10-3.2-3.2-10 10L4 20z"/><path d="M13.8 7l3.2 3.2"/></svg>
+            </span>
+            <span>Editar</span>
+          </button>
+
+          <button class="saved-action-btn action-duplicate" onclick="duplicarOrcamento(${x.id})" title="Duplicar orçamento">
+            <span class="saved-action-icon">
+              <svg viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            </span>
+            <span>Duplicar</span>
+          </button>
+
+          <button class="saved-action-btn action-delete" onclick="excluirOrcamento(${x.id})" title="Excluir orçamento">
+            <span class="saved-action-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M7 7l1 13h8l1-13"/><path d="M10 11v5M14 11v5"/></svg>
+            </span>
+            <span>Excluir</span>
+          </button>
+
+          <button class="saved-action-btn action-whatsapp" onclick="enviarOrcamentoWhatsApp(${x.id})" title="Enviar pelo WhatsApp">
+            <span class="saved-action-icon">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M8.5 7.5c.5 4.5 3.5 7.5 8 8"></path>
+                <path d="M8.2 7.2l2 3M16.8 15.8l-3-2"></path>
+                <path d="M5 20l1.2-4"></path>
+              </svg>
+            </span>
+            <span>WhatsApp</span>
+          </button>
+
+          ${
+            aprovado
+            ? `<button class="saved-action-btn action-approved" type="button" disabled title="Orçamento aprovado">
+                <span class="saved-action-icon">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>
+                </span>
+                <span>Aprovado</span>
+              </button>`
+            : `<button class="saved-action-btn action-approve" type="button" onclick="aprovarOrcamentoComoPedido(${x.id})" title="Aprovar orçamento">
+                <span class="saved-action-icon">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>
+                </span>
+                <span>Aprovar</span>
+              </button>`
+          }
+        </div>
+      </div>`;
+    }).join('')+htmlPaginacaoLista('orcamentos',pagina,'renderizarHistorico');
+};
+</script>
+
+
+<script>
+/* ===== FINANCEIRO ===== */
+const RPRINT_PAGAMENTOS_KEY='rprint_pagamentos_v1';
+const RPRINT_DESPESAS_KEY='rprint_despesas_v1';
+
+function moedaFinance(v){return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+function hojeISO(){return new Date().toISOString().slice(0,10)}
+function lerPagamentos(){try{const x=JSON.parse(localStorage.getItem(RPRINT_PAGAMENTOS_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
+function salvarPagamentos(x){localStorage.setItem(RPRINT_PAGAMENTOS_KEY,JSON.stringify(x))}
+function lerDespesas(){try{const x=JSON.parse(localStorage.getItem(RPRINT_DESPESAS_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}}
+function salvarDespesas(x){localStorage.setItem(RPRINT_DESPESAS_KEY,JSON.stringify(x))}
+
+function esconderFinanceiro(){
+  ['dashboardFinanceiroPanel','vendaRapidaPanel','pagamentosPanel','despesasPanel'].forEach(id=>document.getElementById(id)?.classList.remove('show'));
+}
+
+/* Faz todas as páginas antigas esconderem as telas financeiras */
+['mostrarHome','mostrarNovoOrcamento','mostrarOrcamentosSalvos','mostrarPedidos','mostrarClientes','mostrarProdutosAdmin','mostrarBackup'].forEach(nome=>{
+  const original=window[nome];
+  if(typeof original==='function'){
+    window[nome]=function(){esconderFinanceiro();return original.apply(this,arguments)}
+  }
+});
+
+function esconderPaineisBaseFinanceiro(){
+  const home=document.getElementById('homePanel'); if(home)home.style.display='none';
+  const quote=document.getElementById('mainQuote'); if(quote)quote.style.display='none';
+  ['savedPanel','pedidosPanel','clientsPanel','productsAdminPanel','backupPanel'].forEach(id=>document.getElementById(id)?.classList.remove('show'));
+  const topbar=document.getElementById('mainTopbar'); if(topbar)topbar.style.display='flex';
+  mostrarAcoesOrcamentoTopbar(false);
+  esconderFinanceiro();
+}
+function ativarNavFinanceiro(id){
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+window.mostrarDashboardFinanceiro=function(){
+  esconderPaineisBaseFinanceiro();document.getElementById('dashboardFinanceiroPanel')?.classList.add('show');ativarNavFinanceiro('navDashboard');atualizarDashboardFinanceiro();
+}
+window.mostrarPagamentos=function(){
+  esconderPaineisBaseFinanceiro();document.getElementById('pagamentosPanel')?.classList.add('show');ativarNavFinanceiro('navPagamentos');renderPagamentos();
+}
+window.mostrarVendaRapida=function(){
+  esconderPaineisBaseFinanceiro();
+  document.getElementById('vendaRapidaPanel')?.classList.add('show');
+  ativarNavFinanceiro('navVendaRapida');
+  renderVendasRapidas();
+}
+window.mostrarDespesas=function(){
+  garantirDespesasRecorrentesProximas();
+  esconderPaineisBaseFinanceiro();document.getElementById('despesasPanel')?.classList.add('show');ativarNavFinanceiro('navDespesas');renderDespesas();
+}
+
+function pedidosFinanceiros(){return typeof lerPedidosLocal==='function'?lerPedidosLocal():[]}
+function pagamentosDoPedido(id){return lerPagamentos().filter(p=>Number(p.pedidoId)===Number(id))}
+function totalPagoPedido(id){return pagamentosDoPedido(id).reduce((s,p)=>s+(Number(p.valor)||0),0)}
+function totalDescontoPedido(id){return pagamentosDoPedido(id).reduce((s,p)=>s+(Number(p.desconto)||0),0)}
