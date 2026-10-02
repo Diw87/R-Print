@@ -1,0 +1,249 @@
+function saldoFinanceiroPedido(p){
+  const total=Number(p?.total)||0;
+  return Math.max(0,total-totalPagoPedido(p?.id)-totalDescontoPedido(p?.id));
+}
+function statusPagamentoPedido(p){
+  const total=Number(p.total)||0,pago=totalPagoPedido(p.id),desconto=totalDescontoPedido(p.id);
+  if(total>0 && pago+desconto>=total-.005)return 'Pago';
+  if(pago>0||desconto>0)return 'Parcial';
+  return 'Pendente';
+}
+
+
+function atualizarVisualDescontoPagamento(){
+  const chk=document.getElementById('pagamentoUsarDesconto');
+  const btn=document.getElementById('pagamentoDescontoToggle');
+  const txt=document.getElementById('pagamentoDescontoTexto');
+  const icon=btn?.querySelector('.payment-discount-icon');
+  const campo=document.getElementById('pagamentoDescontoCampo');
+  if(!chk||!btn||!txt||!campo)return;
+  const ativo=chk.checked;
+  btn.classList.toggle('active',ativo);
+  txt.textContent=ativo?'Ativado':'Desativado';
+  if(icon)icon.textContent=ativo?'✓':'×';
+  campo.classList.toggle('show',ativo);
+  if(!ativo){
+    const inp=document.getElementById('pagamentoDescontoValor');
+    if(inp)inp.value='0';
+  }
+}
+function alternarDescontoPagamento(){
+  const chk=document.getElementById('pagamentoUsarDesconto');
+  if(!chk)return;
+  chk.checked=!chk.checked;
+  atualizarVisualDescontoPagamento();
+  atualizarResumoPagamentoDesconto();
+}
+function atualizarResumoPagamentoDesconto(){
+  const pedidoId=Number(document.getElementById('pagamentoPedidoId')?.value)||0;
+  const pedido=pedidosFinanceiros().find(p=>Number(p.id)===pedidoId);
+  if(!pedido)return;
+
+  const saldo=saldoFinanceiroPedido(pedido);
+  const pagamento=Math.max(0,Number(document.getElementById('pagamentoNovoValor')?.value)||0);
+  const usar=!!document.getElementById('pagamentoUsarDesconto')?.checked;
+  const desconto=usar?Math.max(0,Number(document.getElementById('pagamentoDescontoValor')?.value)||0):0;
+  const depois=Math.max(0,saldo-pagamento-desconto);
+
+  document.getElementById('pagamentoSaldoAntes').textContent=moedaFinance(saldo);
+  document.getElementById('pagamentoResumoPago').textContent=moedaFinance(pagamento);
+  document.getElementById('pagamentoResumoDesconto').textContent=moedaFinance(desconto);
+  document.getElementById('pagamentoSaldoDepois').textContent=moedaFinance(depois);
+}
+function abrirPagamentoPedido(id){
+  const pedido=pedidosFinanceiros().find(p=>Number(p.id)===Number(id)); if(!pedido)return;
+  const pago=totalPagoPedido(id);
+  document.getElementById('pagamentoPedidoId').value=id;
+  document.getElementById('pagamentoModalSub').textContent=`Pedido ${pedido.numero||'-'} • ${pedido.cliente||''}`;
+  document.getElementById('pagamentoTotalPedido').value=moedaFinance(pedido.total||0);
+  document.getElementById('pagamentoJaPago').value=moedaFinance(pago);
+  document.getElementById('pagamentoNovoValor').value='';
+  document.getElementById('pagamentoUsarDesconto').checked=false;
+  document.getElementById('pagamentoDescontoValor').value='0';
+  atualizarVisualDescontoPagamento();
+  document.getElementById('pagamentoData').value=hojeISO();
+  document.getElementById('pagamentoForma').value='PIX';
+  document.getElementById('pagamentoObs').value='';
+  atualizarResumoPagamentoDesconto();
+  document.getElementById('pagamentoModalBackdrop').classList.add('show');
+}
+function fecharPagamentoModal(){document.getElementById('pagamentoModalBackdrop')?.classList.remove('show')}
+function salvarPagamentoPedido(){
+  const pedidoId=Number(document.getElementById('pagamentoPedidoId').value);
+  const pedido=pedidosFinanceiros().find(p=>Number(p.id)===pedidoId);
+  if(!pedido)return;
+
+  const valor=Math.max(0,Number(document.getElementById('pagamentoNovoValor').value)||0);
+  const usarDesconto=!!document.getElementById('pagamentoUsarDesconto').checked;
+  const desconto=usarDesconto?Math.max(0,Number(document.getElementById('pagamentoDescontoValor').value)||0):0;
+
+  if(valor<=0){alert('Informe um valor de pagamento válido.');return}
+  if(usarDesconto && desconto<=0){alert('Informe o valor do desconto.');return}
+
+  const saldo=saldoFinanceiroPedido(pedido);
+  if(valor+desconto>saldo+.01 && !confirm('Pagamento + desconto ultrapassam o saldo do pedido. Deseja continuar?'))return;
+
+  const lista=lerPagamentos();
+  lista.push({
+    id:Date.now(),
+    pedidoId,
+    valor,
+    desconto,
+    data:document.getElementById('pagamentoData').value||hojeISO(),
+    forma:document.getElementById('pagamentoForma').value,
+    obs:document.getElementById('pagamentoObs').value.trim(),
+    criadoEm:new Date().toISOString()
+  });
+
+  salvarPagamentos(lista);
+  fecharPagamentoModal();
+  renderPagamentos();
+  atualizarDashboardFinanceiro();
+}
+function excluirPagamento(id){
+  if(!confirm('Excluir este registro de pagamento?'))return;
+  salvarPagamentos(lerPagamentos().filter(p=>Number(p.id)!==Number(id)));renderPagamentos();atualizarDashboardFinanceiro();
+}
+
+function lerVendasRapidas(){
+  return lerPagamentos().filter(p=>p.tipo==='venda_rapida');
+}
+
+function abrirNovaVendaRapida(){
+  document.getElementById('vendaRapidaId').value='';
+  document.getElementById('vendaRapidaCliente').value='';
+  document.getElementById('vendaRapidaDescricao').value='';
+  document.getElementById('vendaRapidaValor').value='';
+  document.getElementById('vendaRapidaCusto').value='0';
+  document.getElementById('vendaRapidaForma').value='PIX';
+  document.getElementById('vendaRapidaData').value=hojeISO();
+  document.getElementById('vendaRapidaObs').value='';
+  document.getElementById('vendaRapidaModalTitulo').textContent='Nova venda rápida';
+  atualizarResumoVendaRapida();
+  document.getElementById('vendaRapidaModalBackdrop')?.classList.add('show');
+}
+function fecharVendaRapidaModal(){
+  document.getElementById('vendaRapidaModalBackdrop')?.classList.remove('show');
+}
+function atualizarResumoVendaRapida(){
+  const valor=Number(document.getElementById('vendaRapidaValor')?.value)||0;
+  const custo=Number(document.getElementById('vendaRapidaCusto')?.value)||0;
+  const lucro=valor-custo;
+  const input=document.getElementById('vendaRapidaLucroPreview');
+  if(input)input.value=moedaFinance(lucro);
+}
+function editarVendaRapida(id){
+  const v=lerPagamentos().find(p=>Number(p.id)===Number(id)&&p.tipo==='venda_rapida');
+  if(!v)return;
+  document.getElementById('vendaRapidaId').value=v.id;
+  document.getElementById('vendaRapidaCliente').value=v.cliente||'';
+  document.getElementById('vendaRapidaDescricao').value=v.descricao||'';
+  document.getElementById('vendaRapidaValor').value=Number(v.valor)||0;
+  document.getElementById('vendaRapidaCusto').value=Number(v.custo)||0;
+  document.getElementById('vendaRapidaForma').value=v.forma||'PIX';
+  document.getElementById('vendaRapidaData').value=v.data||hojeISO();
+  document.getElementById('vendaRapidaObs').value=v.obs||'';
+  document.getElementById('vendaRapidaModalTitulo').textContent='Editar venda rápida';
+  atualizarResumoVendaRapida();
+  document.getElementById('vendaRapidaModalBackdrop')?.classList.add('show');
+}
+function salvarVendaRapida(adicionarOutra=false){
+  const descricao=(document.getElementById('vendaRapidaDescricao').value||'').trim();
+  const valor=Number(document.getElementById('vendaRapidaValor').value)||0;
+  const custo=Math.max(0,Number(document.getElementById('vendaRapidaCusto').value)||0);
+
+  if(!descricao){
+    alert('Informe o produto ou serviço.');
+    return;
+  }
+  if(valor<=0){
+    alert('Informe o valor recebido.');
+    return;
+  }
+
+  const lista=lerPagamentos();
+  const id=Number(document.getElementById('vendaRapidaId').value)||Date.now();
+  const anterior=lista.find(p=>Number(p.id)===id);
+
+  const obj={
+    ...(anterior||{}),
+    id,
+    tipo:'venda_rapida',
+    pedidoId:null,
+    numero:'',
+    cliente:(document.getElementById('vendaRapidaCliente').value||'').trim(),
+    descricao,
+    valor,
+    custo,
+    forma:document.getElementById('vendaRapidaForma').value,
+    data:document.getElementById('vendaRapidaData').value||hojeISO(),
+    obs:(document.getElementById('vendaRapidaObs').value||'').trim(),
+    criadoEm:anterior?.criadoEm||new Date().toISOString(),
+    atualizadoEm:new Date().toISOString()
+  };
+
+  const i=lista.findIndex(p=>Number(p.id)===id);
+  if(i>=0)lista[i]=obj;else lista.push(obj);
+  salvarPagamentos(lista);
+
+  renderVendasRapidas();
+  atualizarDashboardFinanceiro();
+
+  if(adicionarOutra){
+    abrirNovaVendaRapida();
+  }else{
+    fecharVendaRapidaModal();
+  }
+}
+function excluirVendaRapida(id){
+  if(!confirm('Excluir esta venda rápida? O valor será removido do faturamento.'))return;
+  salvarPagamentos(lerPagamentos().filter(p=>Number(p.id)!==Number(id)));
+  renderVendasRapidas();
+  atualizarDashboardFinanceiro();
+}
+function renderVendasRapidas(){
+  const box=document.getElementById('vendasRapidasList');
+  if(!box)return;
+
+  const q=(document.getElementById('vendasRapidasSearch')?.value||'').toLowerCase().trim();
+  const vendas=lerVendasRapidas()
+    .filter(v=>!q ||
+      String(v.cliente||'').toLowerCase().includes(q) ||
+      String(v.descricao||'').toLowerCase().includes(q))
+    .sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+
+  const recebido=vendas.reduce((s,v)=>s+(Number(v.valor)||0),0);
+  const lucro=vendas.reduce((s,v)=>s+(Number(v.valor)||0)-(Number(v.custo)||0),0);
+
+  document.getElementById('vendaRapidaQtd').textContent=String(vendas.length);
+  document.getElementById('vendaRapidaRecebido').textContent=moedaFinance(recebido);
+  document.getElementById('vendaRapidaLucro').textContent=moedaFinance(lucro);
+
+  if(!vendas.length){
+    box.innerHTML='<div class="finance-empty">Nenhuma venda rápida registrada.</div>';
+    return;
+  }
+
+  const pagina=paginarLista(vendas,'vendasRapidas');
+
+  box.innerHTML='<div class="finance-row payment-row header"><div>Data</div><div>Cliente / serviço</div><div>Recebido</div><div>Custo</div><div>Lucro</div><div>Pagamento</div><div>Ações</div></div>'+
+    pagina.itens.map(v=>{
+      const lucro=(Number(v.valor)||0)-(Number(v.custo)||0);
+      const cls=lucro>=0?'quick-sale-profit-positive':'quick-sale-profit-negative';
+      return `<div class="finance-row payment-row">
+        <div>${v.data?new Date(v.data+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</div>
+        <div>
+          <strong>${escapar(v.cliente||'Venda direta')}</strong><span class="quick-sale-badge">Venda Rápida</span>
+          <br><small>${escapar(v.descricao||'-')}</small>
+        </div>
+        <div><strong>${moedaFinance(v.valor)}</strong></div>
+        <div>${moedaFinance(v.custo||0)}</div>
+        <div><strong class="${cls}">${moedaFinance(lucro)}</strong></div>
+        <div>${escapar(v.forma||'-')}</div>
+        <div class="finance-row-actions">
+          <button class="btn btn-outline" onclick="editarVendaRapida(${v.id})">Editar</button>
+          <button class="btn btn-danger" onclick="excluirVendaRapida(${v.id})">Excluir</button>
+        </div>
+      </div>`;
+    }).join('')+htmlPaginacaoLista('vendasRapidas',pagina,'renderVendasRapidas');
+}
