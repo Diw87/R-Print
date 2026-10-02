@@ -1,0 +1,500 @@
+  return len*((f.sx+f.sy)/2);
+}
+function svgAreaLaser(el){
+  try{
+    const b=el.getBBox();
+    if(!b || !isFinite(b.width) || !isFinite(b.height))return 0;
+    const f=fatorEscalaElementoLaser(el);
+    return Math.abs(b.width*b.height*f.sx*f.sy);
+  }catch(e){return 0}
+}
+
+let laserSvgMaterialMedidas={
+  larguraMm:0,
+  alturaMm:0,
+  areaM2:0,
+  arquivo:''
+};
+let laserFitaEstado={ativa:false,areaBaseM2:0,comprimentoCorteM:0,metros:0,custo:0,marcadores:0,pecasEstimadas:0,larguraMarcadorMm:0,alturaMarcadorMm:0,comprimentoPecaMm:0,referenciaArea:0,areaTotalVermelha:0};
+
+
+function preencherFitasLaser(){
+  const sel=document.getElementById('laserFitaMaterial');
+  if(!sel || typeof lerMateriais!=='function')return;
+
+  const atual=sel.value;
+  const materiais=lerMateriais().filter(m=>{
+    const nome=String(m.nome||'').toLowerCase();
+    return m.unidade==='m' || nome.includes('fita');
+  });
+
+  sel.innerHTML='<option value="">Selecione...</option>'+
+    materiais.map(m=>{
+      const largura=Number(m.largura)||0;
+      const metros=Number(m.qtdMetros)||0;
+      const valor=Number(m.valorPeca)||0;
+      let detalhe='';
+      if(largura>0)detalhe+=` • ${(largura*1000).toLocaleString('pt-BR',{maximumFractionDigits:1})} mm`;
+      if(metros>0)detalhe+=` • ${metros.toLocaleString('pt-BR')} m`;
+      if(valor>0)detalhe+=` • ${moedaFinance(valor)}`;
+      return `<option value="${m.id}">${escapar(m.nome)}${detalhe}</option>`;
+    }).join('');
+
+  if([...sel.options].some(o=>o.value===atual))sel.value=atual;
+}
+
+function custoMetroFitaLaser(m){
+  if(!m)return 0;
+  if(m.unidade==='m' && Number(m.custo)>0)return Number(m.custo)||0;
+
+  const metros=Number(m.qtdMetros)||0;
+  const valor=Number(m.valorPeca)||0;
+  if(metros>0 && valor>0)return valor/metros;
+
+  return 0;
+}
+
+function atualizarVisualFitaLaser(){
+  const chk=document.getElementById('laserFitaAtiva');
+  const btn=document.getElementById('laserFitaToggleBtn');
+  const txt=document.getElementById('laserFitaToggleTexto');
+  const icon=btn?.querySelector('.laser-state-icon');
+  const detalhes=document.getElementById('laserFitaDetalhes');
+  if(!chk||!btn||!txt||!detalhes)return;
+
+  const ativa=chk.checked;
+  laserFitaEstado.ativa=ativa;
+  btn.classList.toggle('active',ativa);
+  txt.textContent=ativa?'Ativada':'Desativada';
+  if(icon)icon.textContent=ativa?'✓':'×';
+  detalhes.classList.toggle('show',ativa);
+}
+
+function alternarFitaLaser(){
+  const chk=document.getElementById('laserFitaAtiva');
+  if(!chk)return;
+  chk.checked=!chk.checked;
+  atualizarVisualFitaLaser();
+  calcularFitaLaser();
+}
+
+function calcularFitaLaser(){
+  const ativa=!!document.getElementById('laserFitaAtiva')?.checked;
+  laserFitaEstado.ativa=ativa;
+  const sel=document.getElementById('laserFitaMaterial');
+  const material=typeof lerMateriais==='function'?lerMateriais().find(m=>String(m.id)===String(sel?.value)):null;
+  const qtdPecas=Math.max(0,Math.round(Number(laserFitaEstado.pecasEstimadas)||0));
+  const w=Math.max(0,Number(laserFitaEstado.larguraMarcadorMm)||0);
+  const h=Math.max(0,Number(laserFitaEstado.alturaMarcadorMm)||0);
+  let comprimentoPeca=0;
+  if(w>0&&h>0){
+    const larguraFitaMm=material?(Number(material.largura)||0)*1000:0;
+    if(larguraFitaMm>0){
+      comprimentoPeca=Math.abs(w-larguraFitaMm)<=Math.abs(h-larguraFitaMm)?h:w;
+    }else comprimentoPeca=Math.min(w,h);
+  }
+  laserFitaEstado.comprimentoPecaMm=comprimentoPeca;
+  const metros=(qtdPecas*comprimentoPeca)/1000;
+  let custo=0,info='Selecione uma fita cadastrada e anexe um SVG com retângulos azuis de referência.';
+  if(ativa&&material){
+    const custoMetro=custoMetroFitaLaser(material);
+    custo=metros*custoMetro;
+    info=`${material.nome}`;
+    if(Number(material.largura)>0)info+=` • ${(Number(material.largura)*1000).toLocaleString('pt-BR',{maximumFractionDigits:1})} mm`;
+    if(Number(material.qtdMetros)>0)info+=` • rolo ${Number(material.qtdMetros).toLocaleString('pt-BR')} m`;
+    if(custoMetro>0)info+=` • ${moedaFinance(custoMetro)}/m`;
+    if(comprimentoPeca>0)info+=` • ${comprimentoPeca.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} mm por pedaço`;
+  }
+  laserFitaEstado.metros=ativa?metros:0;
+  laserFitaEstado.custo=ativa?custo:0;
+  const marc=document.getElementById('laserFitaMarcadores'),pecas=document.getElementById('laserFitaPecas'),
+        metrosEl=document.getElementById('laserFitaMetros'),custoEl=document.getElementById('laserFitaCusto'),
+        infoEl=document.getElementById('laserFitaInfo'),status=document.getElementById('laserFitaModeloStatus'),
+        peca=document.getElementById('laserFitaPecaDetectada');
+  if(marc)marc.textContent=String(Number(laserFitaEstado.marcadores)||0);
+  if(pecas)pecas.textContent=String(qtdPecas);
+  if(metrosEl)metrosEl.textContent=(ativa?metros:0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' m';
+  if(custoEl)custoEl.textContent=moedaFinance(ativa?custo:0);
+  if(infoEl)infoEl.textContent=info;
+  if(status)status.value=laserFitaEstado.marcadores?`${laserFitaEstado.marcadores} retângulo(s) azul(is) detectado(s)`:'Aguardando retângulos azuis...';
+  if(peca)peca.value=(w>0&&h>0)?`${w.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} × ${h.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})} mm`:'—';
+  if(typeof calcularLaser==='function')calcularLaser();
+}
+
+function custoM2MaterialLaser(m){
+  if(!m)return 0;
+
+  // Material já cadastrado em m².
+  if(m.unidade==='m2' && Number(m.custo)>0){
+    return Number(m.custo)||0;
+  }
+
+  // Caso antigo/alternativo: deriva do valor da chapa e das dimensões cadastradas.
+  const largura=Number(m.largura)||0;
+  const altura=Number(m.altura)||0;
+  const valor=Number(m.valorPeca)||0;
+  const area=largura*altura;
+  if(area>0 && valor>0)return valor/area;
+
+  return 0;
+}
+
+function preencherMateriaisLaser(){
+  const sel=document.getElementById('laserMaterialSelecionado');
+  if(!sel || typeof lerMateriais!=='function')return;
+
+  const atual=sel.value;
+  const materiais=lerMateriais().filter(m=>{
+    // Prioriza materiais em chapa/m² ou com dimensões físicas cadastradas.
+    return m.unidade==='m2' || ((Number(m.largura)||0)>0 && (Number(m.altura)||0)>0);
+  });
+
+  sel.innerHTML='<option value="">Sem material / selecionar...</option>'+
+    materiais.map(m=>{
+      const custoM2=custoM2MaterialLaser(m);
+      const dim=(Number(m.largura)>0&&Number(m.altura)>0)
+        ? ` • ${Number(m.largura).toLocaleString('pt-BR')}×${Number(m.altura).toLocaleString('pt-BR')} m`
+        : '';
+      return `<option value="${m.id}">${escapar(m.nome)}${dim}${custoM2?` • ${moedaFinance(custoM2)}/m²`:''}</option>`;
+    }).join('');
+
+  if([...sel.options].some(o=>o.value===atual))sel.value=atual;
+}
+
+function atualizarMaterialLaserSelecionado(){
+  preencherMateriaisLaser();
+
+  const sel=document.getElementById('laserMaterialSelecionado');
+  const material=typeof lerMateriais==='function'
+    ? lerMateriais().find(m=>String(m.id)===String(sel?.value))
+    : null;
+
+  const areaM2=Math.max(0,Number(laserSvgMaterialMedidas.areaM2)||0);
+  const larguraMm=Math.max(0,Number(laserSvgMaterialMedidas.larguraMm)||0);
+  const alturaMm=Math.max(0,Number(laserSvgMaterialMedidas.alturaMm)||0);
+
+  let custo=0;
+  let info='Selecione um material cadastrado para calcular automaticamente o custo da área usada.';
+  let aproveitamento='—';
+
+  if(material){
+    const custoM2=custoM2MaterialLaser(material);
+    custo=areaM2*custoM2;
+
+    const chapaLargM=(Number(material.largura)||0);
+    const chapaAltM=(Number(material.altura)||0);
+    const areaChapa=chapaLargM*chapaAltM;
+
+    if(areaChapa>0 && areaM2>0){
+      const perc=(areaM2/areaChapa)*100;
+      aproveitamento=perc.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'% da chapa';
+
+      const cabeLargura=larguraMm<=chapaLargM*1000 && alturaMm<=chapaAltM*1000;
+      const cabeGirado=larguraMm<=chapaAltM*1000 && alturaMm<=chapaLargM*1000;
+      const cabe=cabeLargura||cabeGirado;
+
+      info=`${material.nome}: chapa ${chapaLargM.toLocaleString('pt-BR')} × ${chapaAltM.toLocaleString('pt-BR')} m`;
+      if(Number(material.valorPeca)>0)info+=` • peça inteira ${moedaFinance(material.valorPeca)}`;
+      if(custoM2>0)info+=` • ${moedaFinance(custoM2)}/m²`;
+      info+=cabe?' • o desenho cabe na chapa.':' • atenção: o desenho ultrapassa as dimensões cadastradas da chapa.';
+    }else if(custoM2>0){
+      info=`${material.nome} • ${moedaFinance(custoM2)}/m²`;
+    }else{
+      info=`${material.nome}: não foi possível determinar o custo por m². Confira o cadastro do material.`;
+    }
+  }
+
+  const custoInput=document.getElementById('laserMaterialPeca');
+  if(custoInput && material && areaM2>0){
+    custoInput.value=custo.toFixed(2);
+  }
+
+  const custoEl=document.getElementById('laserSvgCustoMaterial');
+  const apEl=document.getElementById('laserSvgAproveitamentoChapa');
+  const infoEl=document.getElementById('laserMaterialInfo');
+  if(custoEl)custoEl.textContent=moedaFinance(custo);
+  if(apEl)apEl.textContent=aproveitamento;
+  if(infoEl)infoEl.textContent=info;
+
+  calcularLaser();
+}
+
+function atualizarMedidasMaterialSvgLaser(larguraMm,alturaMm,arquivo){
+  larguraMm=Math.max(0,Number(larguraMm)||0);
+  alturaMm=Math.max(0,Number(alturaMm)||0);
+  const areaM2=(larguraMm/1000)*(alturaMm/1000);
+
+  laserSvgMaterialMedidas={
+    larguraMm,
+    alturaMm,
+    areaM2,
+    arquivo:arquivo||''
+  };
+
+  const tam=document.getElementById('laserSvgTamanhoMaterial');
+  const area=document.getElementById('laserSvgAreaMaterial');
+
+  if(tam){
+    tam.textContent=
+      (larguraMm/10).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+
+      ' × '+
+      (alturaMm/10).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+
+      ' cm';
+  }
+  if(area){
+    area.textContent=areaM2.toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' m²';
+  }
+
+  atualizarMaterialLaserSelecionado();
+}
+
+
+function pontoDentroGeometriaLaser(el,x,y){
+  try{if(typeof el.isPointInFill==='function')return !!el.isPointInFill(new DOMPoint(x,y))}catch(e){}
+  try{const b=el.getBBox();return x>=b.x&&x<=b.x+b.width&&y>=b.y&&y<=b.y+b.height}catch(e){return false}
+}
+function areaAproximadaGeometriaLaser(el,n=32){
+  try{
+    const b=el.getBBox();if(!b||b.width<=0||b.height<=0)return 0;
+    let dentro=0,total=0;
+    for(let iy=0;iy<n;iy++){const y=b.y+(iy+.5)*b.height/n;
+      for(let ix=0;ix<n;ix++){const x=b.x+(ix+.5)*b.width/n;total++;if(pontoDentroGeometriaLaser(el,x,y))dentro++}
+    }
+    return total?b.width*b.height*dentro/total:0;
+  }catch(e){return 0}
+}
+function detectarModeloFitaSvgLaser(svg,vermelhos,sxMm,syMm){
+  const azuis=[...svg.querySelectorAll('rect')].filter(el=>{
+    let raw='';
+    try{raw=(getComputedStyle(el).fill||el.getAttribute('fill')||'').toLowerCase().replace(/\s+/g,'')}catch(e){}
+    return raw==='blue'||raw==='#0000ff'||raw==='rgb(0,0,255)';
+  });
+  if(!azuis.length){
+    laserFitaEstado.marcadores=0;laserFitaEstado.pecasEstimadas=0;
+    laserFitaEstado.larguraMarcadorMm=0;laserFitaEstado.alturaMarcadorMm=0;return;
+  }
+  const ms=azuis.map(el=>{
+    const b=el.getBBox(),f=fatorEscalaElementoLaser(el);
+    return {cx:b.x+b.width/2,cy:b.y+b.height/2,wMm:Math.abs(b.width*f.sx*sxMm),hMm:Math.abs(b.height*f.sy*syMm)};
+  });
+  const avg=a=>a.reduce((s,v)=>s+v,0)/Math.max(1,a.length);
+  laserFitaEstado.marcadores=ms.length;
+  laserFitaEstado.larguraMarcadorMm=avg(ms.map(m=>m.wMm));
+  laserFitaEstado.alturaMarcadorMm=avg(ms.map(m=>m.hMm));
+
+  let ref=null,melhor=0;
+  vermelhos.forEach(el=>{
+    let q=0;ms.forEach(m=>{if(pontoDentroGeometriaLaser(el,m.cx,m.cy))q++});
+    if(q>melhor){melhor=q;ref=el}
+  });
+  if(!ref){
+    vermelhos.forEach(el=>{try{
+      const b=el.getBBox(),q=ms.filter(m=>m.cx>=b.x&&m.cx<=b.x+b.width&&m.cy>=b.y&&m.cy<=b.y+b.height).length;
+      if(q>melhor){melhor=q;ref=el}
+    }catch(e){}})
+  }
+
+  const qtdRef=Math.max(1,melhor||ms.length);
+  const areaRef=ref?areaAproximadaGeometriaLaser(ref,40):0;
+  let total=ms.length,areaTotal=0;
+
+  if(areaRef>0){
+    total=0;
+    vermelhos.forEach(el=>{
+      const a=areaAproximadaGeometriaLaser(el,32);if(a<=0)return;
+      areaTotal+=a;
+      if(el===ref)total+=qtdRef;
+      else total+=Math.max(0,Math.round((a/areaRef)*qtdRef));
+    });
+  }else if(ref){
+    try{
+      const br=ref.getBBox(),ar=br.width*br.height;
+      if(ar>0){
+        total=0;
+        vermelhos.forEach(el=>{try{
+          const b=el.getBBox(),a=b.width*b.height;
+          total+=el===ref?qtdRef:Math.max(0,Math.round((a/ar)*qtdRef));
+        }catch(e){}})
+      }
+    }catch(e){}
+  }
+  laserFitaEstado.referenciaArea=areaRef;
+  laserFitaEstado.areaTotalVermelha=areaTotal;
+  laserFitaEstado.pecasEstimadas=Math.max(ms.length,total);
+}
+async function analisarSvgLaser(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  const info=document.getElementById('laserSvgInfo');
+  info.textContent='Analisando '+file.name+'...';
+
+  let host=null;
+  try{
+    const txt=await file.text();
+    const parsed=new DOMParser().parseFromString(txt,'image/svg+xml');
+    if(parsed.querySelector('parsererror'))throw new Error('SVG inválido');
+
+    // Importa o SVG inteiro para um contêiner invisível.
+    // Isso é importante para que classes, grupos e estilos herdados sejam resolvidos.
+    host=document.createElement('div');
+    host.style.cssText='position:fixed;left:-100000px;top:-100000px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+    const imported=document.importNode(parsed.documentElement,true);
+    host.appendChild(imported);
+    document.body.appendChild(host);
+    const svg=imported;
+
+    const w=parseLenSvgLaser(svg.getAttribute('width'));
+    const h=parseLenSvgLaser(svg.getAttribute('height'));
+    const vb=(svg.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+
+    let sxMm=25.4/96, syMm=25.4/96;
+    let escalaConfiavel=false;
+
+    if(w&&h&&w.u!=='px'&&h.u!=='px'&&vb.length===4&&vb[2]>0&&vb[3]>0){
+      const wm=toMmSvgLaser(w.v,w.u),hm=toMmSvgLaser(h.v,h.u);
+      if(wm!==null&&hm!==null){
+        sxMm=wm/vb[2];
+        syMm=hm/vb[3];
+        escalaConfiavel=true;
+      }
+    }else if(w&&h&&w.u!=='px'&&h.u!=='px'){
+      const wm=toMmSvgLaser(w.v,w.u),hm=toMmSvgLaser(h.v,h.u);
+      if(wm!==null&&hm!==null){
+        sxMm=wm/(w.v||1);
+        syMm=hm/(h.v||1);
+        escalaConfiavel=true;
+      }
+    }
+
+    let cutUnits=0, engraveAreaUnits2=0, engraveLineUnits=0;
+    let reds=0, blacks=0;
+
+    const elements=[...svg.querySelectorAll('path,line,rect,circle,ellipse,polyline,polygon,text,image')];
+    const elementosVermelhos=[];
+
+    // Mede a área total ocupada pelo desenho no arquivo.
+    // Essa medida é usada para saber quanto da chapa será consumido.
+    let bboxGeral=null;
+    try{
+      const b=svg.getBBox();
+      if(b && b.width>0 && b.height>0){
+        bboxGeral={width:b.width,height:b.height};
+      }
+    }catch(e){}
+
+    // Fallback: usa o viewBox/width do arquivo se o navegador não entregar getBBox da raiz.
+    if(!bboxGeral){
+      if(vb.length===4 && vb[2]>0 && vb[3]>0){
+        bboxGeral={width:vb[2],height:vb[3]};
+      }else{
+        bboxGeral={width:0,height:0};
+      }
+    }
+    elements.forEach(el=>{
+      const c=svgColorLaser(el);
+
+      if(c.stroke==='red' || c.fill==='red'){
+        const l=svgLineLenLaser(el);
+        if(l>0){cutUnits+=l;reds++}
+        if(['path','rect','circle','ellipse','polygon','polyline'].includes(el.tagName.toLowerCase()))elementosVermelhos.push(el);
+      }
+
+      // Preto preenchido = gravação raster.
+      if(c.fill==='black'){
+        const a=svgAreaLaser(el);
+        if(a>0){engraveAreaUnits2+=a;blacks++}
+      }else if(c.stroke==='black'){
+        // Preto apenas em linha = gravação vetorial.
+        const l=svgLineLenLaser(el);
+        if(l>0){engraveLineUnits+=l;blacks++}
+      }
+    });
+
+    const cutMm=cutUnits*((sxMm+syMm)/2);
+    laserFitaEstado.comprimentoCorteM=Math.max(0,cutMm/1000);
+    detectarModeloFitaSvgLaser(svg,elementosVermelhos,sxMm,syMm);
+    const engraveAreaMm2=engraveAreaUnits2*sxMm*syMm;
+    const engraveLineMm=engraveLineUnits*((sxMm+syMm)/2);
+
+    const cfg=lerCfgLaser();
+    const velCorte=Math.max(1,Number(cfg.velCorte)||20);
+    const velGrav=Math.max(1,Number(cfg.velGravacao)||300);
+    const intervalo=Math.max(.01,Number(cfg.intervaloGravacao)||.10);
+
+    const tCut=cutMm/velCorte;
+    const tEngRaster=(engraveAreaMm2/intervalo)/velGrav;
+    const tEngVector=engraveLineMm/velGrav;
+    const tEng=tEngRaster+tEngVector;
+    const total=tCut+tEng;
+
+    const larguraMaterialMm=Math.abs((bboxGeral?.width||0)*sxMm);
+    const alturaMaterialMm=Math.abs((bboxGeral?.height||0)*syMm);
+    atualizarMedidasMaterialSvgLaser(larguraMaterialMm,alturaMaterialMm,file.name);
+
+    // A fita é estimada pelo percurso de corte, não pela caixa total do desenho.
+    // Isso evita inflar o consumo por causa dos espaços vazios entre letras/objetos.
+    laserFitaEstado.areaBaseM2=0;
+    calcularFitaLaser();
+
+    document.getElementById('laserSvgTempoGravacao').textContent=fmtTempoSvgLaser(tEng);
+    document.getElementById('laserSvgAreaGravacao').textContent=
+      (engraveAreaMm2/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' cm²';
+    document.getElementById('laserSvgTempoCorte').textContent=fmtTempoSvgLaser(tCut);
+    document.getElementById('laserSvgComprimentoCorte').textContent=
+      cutMm.toLocaleString('pt-BR',{maximumFractionDigits:0})+' mm';
+    document.getElementById('laserSvgTempoTotal').textContent=fmtTempoSvgLaser(total);
+    document.getElementById('laserSvgCustoEstimado').textContent=
+      moedaLaser((total/60)*(Number(cfg.valorMinuto)||0))+' de máquina';
+
+    if(total>0){
+      document.getElementById('laserTempoPeca').value=(total/60).toFixed(2);
+      calcularLaser();
+    }
+
+    if(!reds && !blacks){
+      info.textContent=`${file.name}: não encontrei objetos pretos ou vermelhos. Verifique as cores do SVG.`;
+    }else if(reds>0 && cutMm<=0){
+      info.textContent=`${file.name}: encontrei ${reds} objeto(s) vermelho(s), mas não consegui medir o caminho de corte.`;
+    }else if(total<=0){
+      info.textContent=`${file.name}: encontrei as cores, mas não consegui medir os vetores.`;
+    }else{
+      info.textContent=
+        `${file.name} analisado: ${blacks} elemento(s) preto(s) e ${reds} vermelho(s). `+
+        `Corte medido: ${cutMm.toLocaleString('pt-BR',{maximumFractionDigits:0})} mm. `+
+        (escalaConfiavel?'Medidas físicas do SVG reconhecidas.':'Escala em px estimada em 96 dpi.');
+    }
+  }catch(e){
+    console.error(e);
+    info.textContent='Não foi possível analisar este SVG.';
+    alert('Não foi possível interpretar o SVG.');
+  }finally{
+    if(host)host.remove();
+    event.target.value='';
+  }
+}
+
+function abrirConfiguracaoLaser(){
+  const c=lerCfgLaser();
+  document.getElementById('laserCfgMaquina').value=c.maquina;
+  document.getElementById('laserCfgTubo').value=c.tubo;
+  document.getElementById('laserCfgHorasDia').value=c.horasDia;
+  document.getElementById('laserCfgMinuto').value=c.valorMinuto;
+  document.getElementById('laserCfgTaxaMinima').value=c.taxaMinima;
+  document.getElementById('laserCfgVelCorte').value=c.velCorte;
+  document.getElementById('laserCfgVelGravacao').value=c.velGravacao;
+  document.getElementById('laserCfgIntervaloGravacao').value=c.intervaloGravacao;
+  document.getElementById('laserConfigBackdrop')?.classList.add('show');
+}
+function fecharConfiguracaoLaser(){document.getElementById('laserConfigBackdrop')?.classList.remove('show')}
+function salvarConfiguracaoLaser(){
+  const cfg={
+    maquina:Number(document.getElementById('laserCfgMaquina').value)||0,
+    tubo:Number(document.getElementById('laserCfgTubo').value)||0,
+    horasDia:Number(document.getElementById('laserCfgHorasDia').value)||0,
+    valorMinuto:Number(document.getElementById('laserCfgMinuto').value)||0,
+    taxaMinima:Number(document.getElementById('laserCfgTaxaMinima').value)||0,
+    velCorte:Number(document.getElementById('laserCfgVelCorte').value)||20,
+    velGravacao:Number(document.getElementById('laserCfgVelGravacao').value)||300,
+    intervaloGravacao:Number(document.getElementById('laserCfgIntervaloGravacao').value)||0.10
+  };
+  salvarCfgLaser(cfg);
