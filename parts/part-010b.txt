@@ -1,0 +1,250 @@
+  font-weight:800;
+  cursor:pointer;
+}
+.laser-toggle-btn .laser-toggle-dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#98a2b3;
+}
+.laser-toggle-btn.active{
+  background:#fdf2f8;
+  border-color:#f2b7d6;
+  color:#b42369;
+}
+.laser-toggle-btn.active .laser-toggle-dot{
+  background:#e85aa8;
+  box-shadow:0 0 0 3px rgba(232,90,168,.12);
+}
+.laser-field-label-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:5px;
+}
+.laser-field-label-row label{margin:0!important}
+.laser-mini-toggle{
+  border:1px solid #d0d5dd;
+  background:#f8f9fb;
+  color:#667085;
+  border-radius:999px;
+  padding:4px 8px;
+  font-family:inherit;
+  font-size:9px;
+  font-weight:800;
+  cursor:pointer;
+}
+.laser-mini-toggle.active{
+  background:#f3efff;
+  border-color:#d8cafa;
+  color:#6d3fc0;
+}
+#laserPreparacaoMin:disabled,
+#laserTaxaMinima:disabled{
+  background:#f2f4f7!important;
+  color:#98a2b3!important;
+  cursor:not-allowed!important;
+}
+</style>
+
+
+<style>
+.laser-state-button{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;
+  min-height:34px!important;padding:7px 11px!important;border-radius:9px!important;border:1px solid #abefc6!important;
+  background:#ecfdf3!important;color:#027a48!important;font-family:inherit!important;font-size:10px!important;font-weight:800!important;
+  cursor:pointer!important;transition:.18s ease!important;box-shadow:none!important
+}
+.laser-state-button .laser-state-icon{
+  width:17px!important;height:17px!important;display:grid!important;place-items:center!important;border-radius:50%!important;
+  background:#12b76a!important;color:#fff!important;font-size:10px!important
+}
+.laser-state-button:not(.active){background:#fff1f3!important;border-color:#fbc2cc!important;color:#b42318!important}
+.laser-state-button:not(.active) .laser-state-icon{background:#ef4444!important}
+.laser-state-button.compact{min-height:28px!important;padding:4px 8px!important;font-size:9px!important}
+#laserPreparacaoMin:disabled,#laserTaxaMinima:disabled{background:#f2f4f7!important;color:#98a2b3!important;cursor:not-allowed!important}
+</style>
+
+
+<style>
+/* ===== DESPESAS RECORRENTES ===== */
+.expense-recurring-box{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+  border:1px solid #e4e7ec;
+  border-radius:10px;
+  background:#fafbfc;
+}
+.expense-recurring-box strong{
+  display:block;
+  color:#344054;
+  font-size:11px;
+}
+.expense-recurring-box small{
+  display:block;
+  margin-top:3px;
+  color:#8a93a2;
+  font-size:9.5px;
+  line-height:1.35;
+}
+.expense-recurring-toggle{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-width:106px;
+  justify-content:center;
+  min-height:32px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid #f4c7cc;
+  background:#fff1f3;
+  color:#b42318;
+  font-family:inherit;
+  font-size:10px;
+  font-weight:800;
+  cursor:pointer;
+}
+.expense-recurring-toggle.active{
+  border-color:#abefc6;
+  background:#ecfdf3;
+  color:#027a48;
+}
+.expense-recurring-dot{
+  width:17px;
+  height:17px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#ef4444;
+  color:#fff;
+  line-height:1;
+}
+.expense-recurring-toggle.active .expense-recurring-dot{background:#12b76a}
+.expense-recurring-details{
+  display:none;
+  margin-top:-2px;
+  padding:10px;
+  border:1px solid #e8e3f1;
+  border-radius:10px;
+  background:#faf8ff;
+}
+.expense-recurring-details.show{display:block}
+.expense-recurring-badge{
+  display:inline-flex;
+  align-items:center;
+  margin-left:5px;
+  padding:3px 6px;
+  border-radius:999px;
+  background:#f3efff;
+  color:#6d3fc0;
+  font-size:8.5px;
+  font-weight:800;
+}
+@media(max-width:600px){
+  .expense-recurring-box{align-items:flex-start;flex-direction:column}
+}
+</style>
+
+
+<style>
+/* ===== VENDA RÁPIDA ===== */
+.quick-sale-summary{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  padding:13px 18px;
+  border-bottom:1px solid #edf0f4;
+  background:#fafbfc;
+}
+.quick-sale-summary>div{
+  padding:10px 11px;
+  border:1px solid #e6e9ef;
+  border-radius:9px;
+  background:#fff;
+}
+.quick-sale-summary span{
+  display:block;
+  color:#7c8798;
+  font-size:9.5px;
+}
+.quick-sale-summary strong{
+  display:block;
+  margin-top:4px;
+  color:#263142;
+  font-size:14px;
+}
+.quick-sale-money{
+  min-height:38px;
+  display:flex;
+  border:1px solid #d7dce5;
+  border-radius:8px;
+  overflow:hidden;
+  background:#fff;
+}
+.quick-sale-money span{
+  width:42px;
+  display:grid;
+  place-items:center;
+  background:#f8f9fb;
+  border-right:1px solid #e1e5eb;
+  color:#667085;
+  font-size:11px;
+  font-weight:700;
+}
+.quick-sale-money input{
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  outline:0!important;
+}
+.quick-sale-info{
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  margin-top:14px;
+  padding:10px 11px;
+  border:1px solid #d7f0e3;
+  border-radius:9px;
+  background:#f0fdf4;
+}
+.quick-sale-info strong{
+  color:#027a48;
+  font-size:10.5px;
+}
+.quick-sale-info span{
+  color:#667085;
+  font-size:9.5px;
+  line-height:1.4;
+}
+.quick-sale-badge{
+  display:inline-flex;
+  margin-left:5px;
+  padding:3px 6px;
+  border-radius:999px;
+  background:#eef4ff;
+  color:#3157a4;
+  font-size:8.5px;
+  font-weight:800;
+}
+.quick-sale-profit-positive{color:#027a48!important}
+.quick-sale-profit-negative{color:#b42318!important}
+@media(max-width:700px){
+  .quick-sale-summary{grid-template-columns:1fr}
+}
+</style>
+
+
+<style>
+/* ===== MATERIAL NA PRECIFICAÇÃO LASER ===== */
+#laserMaterialSelecionado{
+  min-height:38px!important;
+  border:1px solid #d7dce5!important;
+  border-radius:8px!important;
+  background:#fff!important;
+  padding:8px 10px!important;
+  color:#475467!important;
+}
