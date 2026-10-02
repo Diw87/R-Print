@@ -1,0 +1,499 @@
+function renderPagamentos(){
+  const box=document.getElementById('pagamentosList');if(!box)return;
+  const q=(document.getElementById('pagamentosSearch')?.value||'').toLowerCase().trim();
+  let pedidos=pedidosFinanceiros().filter(p=>!q||String(p.numero||'').toLowerCase().includes(q)||String(p.cliente||'').toLowerCase().includes(q));
+  if(!pedidos.length){box.innerHTML='<div class="finance-empty">Nenhum pedido aprovado encontrado.</div>';return}
+  const pagina=paginarLista(pedidos,'pagamentos');
+  box.innerHTML='<div class="finance-row payment-row header"><div>Pedido</div><div>Cliente</div><div>Total</div><div>Pago</div><div>Saldo</div><div>Status</div><div>Ações</div></div>'+
+  pagina.itens.map(p=>{
+    const total=Number(p.total)||0,pago=totalPagoPedido(p.id),desconto=totalDescontoPedido(p.id),saldo=saldoFinanceiroPedido(p),status=statusPagamentoPedido(p),cls=status==='Pago'?'pago':status==='Parcial'?'parcial':'pendente';
+    return `<div class="finance-row payment-row">
+      <div><strong>${escapar(p.numero||'-')}</strong></div>
+      <div><strong>${escapar(p.cliente||'-')}</strong><br><small>${escapar(p.contato||'')}</small></div>
+      <div>${moedaFinance(total)}</div><div>${moedaFinance(pago)}${desconto>0?`<span class="payment-discount-badge">- ${moedaFinance(desconto)}</span>`:''}</div><div>${moedaFinance(saldo)}</div>
+      <div><span class="finance-status ${cls}">${status}</span></div>
+      <div class="finance-row-actions"><button class="btn btn-primary" onclick="abrirPagamentoPedido(${p.id})">＋ Pagamento</button>${pagamentosDoPedido(p.id).length?`<button class="btn btn-outline" onclick="verPagamentosPedido(${p.id})">Histórico</button>`:''}</div>
+    </div>`;
+  }).join('')+htmlPaginacaoLista('pagamentos',pagina,'renderPagamentos');
+}
+function verPagamentosPedido(id){
+  const pedido=pedidosFinanceiros().find(p=>Number(p.id)===Number(id));const regs=pagamentosDoPedido(id);
+  if(!regs.length){alert('Nenhum pagamento registrado.');return}
+  const txt=regs.map(p=>`${new Date((p.data||hojeISO())+'T12:00:00').toLocaleDateString('pt-BR')} • ${p.forma} • Pago ${moedaFinance(p.valor)}${Number(p.desconto)>0?' • Desconto '+moedaFinance(p.desconto):''}${p.obs?' • '+p.obs:''}`).join('\n');
+  alert(`Pagamentos do pedido ${pedido?.numero||'-'}:\n\n${txt}`);
+}
+
+
+function atualizarVisualDespesaRecorrente(){
+  const chk=document.getElementById('despesaRecorrente');
+  const btn=document.getElementById('despesaRecorrenteBtn');
+  const txt=document.getElementById('despesaRecorrenteTexto');
+  const dot=btn?.querySelector('.expense-recurring-dot');
+  const detalhes=document.getElementById('despesaRecorrenteDetalhes');
+  if(!chk||!btn||!txt||!detalhes)return;
+  const ativa=chk.checked;
+  btn.classList.toggle('active',ativa);
+  txt.textContent=ativa?'Ativada':'Desativada';
+  if(dot)dot.textContent=ativa?'✓':'×';
+  detalhes.classList.toggle('show',ativa);
+
+  if(ativa){
+    const venc=document.getElementById('despesaVencimento')?.value;
+    const dia=document.getElementById('despesaDiaVencimento');
+    if(dia && !dia.value && venc){
+      dia.value=Number(venc.slice(8,10))||1;
+    }
+  }
+}
+function alternarDespesaRecorrente(){
+  const chk=document.getElementById('despesaRecorrente');
+  if(!chk)return;
+  chk.checked=!chk.checked;
+  atualizarVisualDespesaRecorrente();
+}
+
+function ultimoDiaMes(ano,mesZero){
+  return new Date(ano,mesZero+1,0).getDate();
+}
+function dataRecorrenteISO(ano,mesZero,dia){
+  const d=Math.min(Math.max(1,Number(dia)||1),ultimoDiaMes(ano,mesZero));
+  return `${ano}-${String(mesZero+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function chaveMesISO(dataISO){
+  return String(dataISO||'').slice(0,7);
+}
+
+/* Gera somente ocorrências que ainda não existem.
+   Mantém cada mês independente para poder marcar como paga separadamente. */
+function garantirDespesasRecorrentesParaMes(dataRef){
+  if(!(dataRef instanceof Date) || isNaN(dataRef))return;
+  const lista=lerDespesas();
+  const series=new Map();
+
+  lista.filter(d=>d.recorrente && d.serieRecorrenteId).forEach(d=>{
+    if(!series.has(d.serieRecorrenteId))series.set(d.serieRecorrenteId,d);
+  });
+
+  if(!series.size)return;
+
+  const ano=dataRef.getFullYear(), mes=dataRef.getMonth();
+  const chave=`${ano}-${String(mes+1).padStart(2,'0')}`;
+  let mudou=false;
+
+  series.forEach(base=>{
+    const existe=lista.some(d=>d.serieRecorrenteId===base.serieRecorrenteId && chaveMesISO(d.vencimento)===chave);
+    if(existe)return;
+
+    const dia=Number(base.diaVencimento)||Number(String(base.vencimento||'').slice(8,10))||1;
+    lista.push({
+      ...base,
+      id:Date.now()+Math.floor(Math.random()*100000),
+      vencimento:dataRecorrenteISO(ano,mes,dia),
+      status:'Pendente',
+      dataPagamento:'',
+      atualizadoEm:new Date().toISOString(),
+      geradaAutomaticamente:true
+    });
+    mudou=true;
+  });
+
+  if(mudou)salvarDespesas(lista);
+}
+
+function garantirDespesasRecorrentesProximas(){
+  const hoje=new Date();
+  garantirDespesasRecorrentesParaMes(new Date(hoje.getFullYear(),hoje.getMonth(),1));
+  garantirDespesasRecorrentesParaMes(new Date(hoje.getFullYear(),hoje.getMonth()+1,1));
+}
+function abrirNovaDespesa(){
+  document.getElementById('despesaId').value='';
+  ['despesaDescricao','despesaFornecedor','despesaValor'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('despesaCategoria').value='Fornecedor';
+  document.getElementById('despesaVencimento').value=hojeISO();
+  document.getElementById('despesaStatus').value='Pendente';
+  document.getElementById('despesaDataPagamento').value='';
+  document.getElementById('despesaRecorrente').checked=false;
+  document.getElementById('despesaDiaVencimento').value=Number(hojeISO().slice(8,10));
+  atualizarVisualDespesaRecorrente();
+  document.getElementById('despesaModalBackdrop').classList.add('show');
+}
+function editarDespesa(id){
+  const d=lerDespesas().find(x=>Number(x.id)===Number(id));if(!d)return;
+  document.getElementById('despesaId').value=d.id;
+  document.getElementById('despesaDescricao').value=d.descricao||'';
+  document.getElementById('despesaFornecedor').value=d.fornecedor||'';
+  document.getElementById('despesaCategoria').value=d.categoria||'Outros';
+  document.getElementById('despesaValor').value=d.valor||'';
+  document.getElementById('despesaVencimento').value=d.vencimento||'';
+  document.getElementById('despesaStatus').value=d.status||'Pendente';
+  document.getElementById('despesaDataPagamento').value=d.dataPagamento||'';
+  document.getElementById('despesaRecorrente').checked=!!d.recorrente;
+  document.getElementById('despesaDiaVencimento').value=d.diaVencimento||Number(String(d.vencimento||'').slice(8,10))||1;
+  atualizarVisualDespesaRecorrente();
+  document.getElementById('despesaModalBackdrop').classList.add('show');
+}
+function fecharDespesaModal(){document.getElementById('despesaModalBackdrop')?.classList.remove('show')}
+function salvarDespesa(){
+  const descricao=document.getElementById('despesaDescricao').value.trim();
+  const valor=Number(document.getElementById('despesaValor').value)||0;
+  if(!descricao){alert('Informe a descrição da despesa.');return}
+  if(valor<=0){alert('Informe um valor válido.');return}
+
+  const recorrente=!!document.getElementById('despesaRecorrente').checked;
+  const vencimento=document.getElementById('despesaVencimento').value;
+  let diaVencimento=Number(document.getElementById('despesaDiaVencimento').value)||Number(String(vencimento||'').slice(8,10))||1;
+  diaVencimento=Math.min(31,Math.max(1,diaVencimento));
+
+  const lista=lerDespesas();
+  const id=Number(document.getElementById('despesaId').value)||Date.now();
+  const anterior=lista.find(x=>Number(x.id)===id);
+  const serieRecorrenteId=recorrente
+    ? (anterior?.serieRecorrenteId || `rec-${Date.now()}-${Math.random().toString(36).slice(2,8)}`)
+    : '';
+
+  const obj={
+    id,descricao,
+    fornecedor:document.getElementById('despesaFornecedor').value.trim(),
+    categoria:document.getElementById('despesaCategoria').value,
+    valor,
+    vencimento,
+    status:document.getElementById('despesaStatus').value,
+    dataPagamento:document.getElementById('despesaDataPagamento').value,
+    recorrente,
+    serieRecorrenteId,
+    diaVencimento,
+    atualizadoEm:new Date().toISOString()
+  };
+
+  const i=lista.findIndex(x=>Number(x.id)===id);
+  if(i>=0)lista[i]=obj;else lista.push(obj);
+  salvarDespesas(lista);
+
+  if(recorrente){
+    garantirDespesasRecorrentesProximas();
+  }
+
+  fecharDespesaModal();
+  renderDespesas();
+  atualizarDashboardFinanceiro();
+  atualizarAlertaDespesasDashboard();
+}
+function marcarDespesaPaga(id){
+  const lista=lerDespesas(),i=lista.findIndex(x=>Number(x.id)===Number(id));if(i<0)return;
+  lista[i].status='Paga';lista[i].dataPagamento=hojeISO();lista[i].atualizadoEm=new Date().toISOString();salvarDespesas(lista);renderDespesas();atualizarDashboardFinanceiro();atualizarAlertaDespesasDashboard();
+}
+function excluirDespesa(id){if(!confirm('Excluir esta despesa?'))return;salvarDespesas(lerDespesas().filter(x=>Number(x.id)!==Number(id)));renderDespesas();atualizarDashboardFinanceiro();atualizarAlertaDespesasDashboard()}
+function renderDespesas(){
+  const box=document.getElementById('despesasList');if(!box)return;
+  const q=(document.getElementById('despesasSearch')?.value||'').toLowerCase().trim();
+  let ds=lerDespesas().sort((a,b)=>String(b.vencimento||'').localeCompare(String(a.vencimento||''))).filter(d=>!q||String(d.descricao||'').toLowerCase().includes(q)||String(d.fornecedor||'').toLowerCase().includes(q));
+  if(!ds.length){box.innerHTML='<div class="finance-empty">Nenhuma despesa cadastrada.</div>';return}
+  const pagina=paginarLista(ds,'despesas');
+  box.innerHTML='<div class="finance-row expense-row header"><div>Descrição</div><div>Fornecedor</div><div>Categoria</div><div>Valor</div><div>Vencimento</div><div>Ações</div></div>'+
+  pagina.itens.map(d=>`<div class="finance-row expense-row">
+    <div><strong>${escapar(d.descricao)}</strong>${d.recorrente?'<span class="expense-recurring-badge">Recorrente</span>':''}<br><span class="finance-status ${d.status==='Paga'?'pago':'pendente'}">${d.status}</span></div>
+    <div>${escapar(d.fornecedor||'-')}</div><div>${escapar(d.categoria||'-')}</div><div>${moedaFinance(d.valor)}</div><div>${d.vencimento?new Date(d.vencimento+'T12:00:00').toLocaleDateString('pt-BR'):'-'}</div>
+    <div class="finance-row-actions">${d.status!=='Paga'?`<button class="btn btn-primary" onclick="marcarDespesaPaga(${d.id})">✓ Pagar</button>`:''}<button class="btn btn-outline" onclick="editarDespesa(${d.id})">Editar</button><button class="btn btn-danger" onclick="excluirDespesa(${d.id})">Excluir</button></div>
+  </div>`).join('')+htmlPaginacaoLista('despesas',pagina,'renderDespesas');
+}
+
+function pagamentosNoPeriodo(inicio,fim){
+  return lerPagamentos().filter(p=>{const d=new Date((p.data||'')+'T12:00:00');return !isNaN(d)&&d>=inicio&&d<=fim})
+}
+function despesasPagasNoPeriodo(inicio,fim){
+  return lerDespesas().filter(d=>d.status==='Paga'&&d.dataPagamento).filter(d=>{const x=new Date(d.dataPagamento+'T12:00:00');return !isNaN(x)&&x>=inicio&&x<=fim})
+}
+let dashboardDataSelecionada=null;
+
+function mesAtualDashboard(){
+  const d=new Date();
+  return new Date(d.getFullYear(),d.getMonth(),1);
+}
+function normalizarMesDashboard(valor){
+  if(!valor)return mesAtualDashboard();
+  const partes=String(valor).split('-');
+  if(partes.length!==2)return mesAtualDashboard();
+  return new Date(Number(partes[0]),Number(partes[1])-1,1);
+}
+function valorInputMesDashboard(data){
+  return `${data.getFullYear()}-${String(data.getMonth()+1).padStart(2,'0')}`;
+}
+let dashboardPopoverAno=null;
+
+function abrirSeletorMesDashboard(event){
+  if(event){
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  const pop=document.getElementById('dashboardMonthPopover');
+  if(!pop)return;
+
+  if(pop.classList.contains('show')){
+    pop.classList.remove('show');
+    return;
+  }
+
+  dashboardPopoverAno=dashboardDataSelecionada.getFullYear();
+  renderMesesPopoverDashboard();
+  pop.classList.add('show');
+}
+
+function mudarAnoPopoverDashboard(delta){
+  dashboardPopoverAno=(dashboardPopoverAno??dashboardDataSelecionada.getFullYear())+delta;
+  renderMesesPopoverDashboard();
+}
+
+function renderMesesPopoverDashboard(){
+  const grid=document.getElementById('dashboardMonthPopoverGrid');
+  const year=document.getElementById('dashboardMonthPopoverYear');
+  if(!grid||!year)return;
+
+  const ano=dashboardPopoverAno??dashboardDataSelecionada.getFullYear();
+  year.textContent=ano;
+  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  grid.innerHTML=meses.map((nome,i)=>{
+    const ativo=dashboardDataSelecionada.getFullYear()===ano && dashboardDataSelecionada.getMonth()===i;
+    return `<button type="button" class="dashboard-month-option ${ativo?'active':''}" onclick="escolherMesPopoverDashboard(${ano},${i})">${nome}</button>`;
+  }).join('');
+}
+
+function escolherMesPopoverDashboard(ano,mes){
+  selecionarMesDashboard(`${ano}-${String(mes+1).padStart(2,'0')}`);
+  document.getElementById('dashboardMonthPopover')?.classList.remove('show');
+}
+
+document.addEventListener('click',function(e){
+  const pop=document.getElementById('dashboardMonthPopover');
+  const btn=document.querySelector('.dashboard-month-picker-button');
+  if(pop?.classList.contains('show') && !pop.contains(e.target) && !btn?.contains(e.target)){
+    pop.classList.remove('show');
+  }
+});
+
+function nomeMesDashboard(data){
+  if(!(data instanceof Date) || isNaN(data))return '';
+  const nome=data.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  return nome.charAt(0).toUpperCase()+nome.slice(1);
+}
+function atualizarNomeBotaoMesDashboard(data){
+  const texto=document.getElementById('dashboardMesTexto');
+  if(texto)texto.textContent=nomeMesDashboard(data);
+}
+
+function selecionarMesDashboard(valor){
+  dashboardDataSelecionada=normalizarMesDashboard(valor);
+  atualizarNomeBotaoMesDashboard(dashboardDataSelecionada);
+  atualizarDashboardFinanceiro();
+}
+function mudarMesDashboard(delta){
+  const base=dashboardDataSelecionada||mesAtualDashboard();
+  const destino=new Date(base.getFullYear(),base.getMonth()+delta,1);
+  const atual=mesAtualDashboard();
+
+  // Não navega para meses futuros.
+  if(destino>atual)return;
+
+  dashboardDataSelecionada=destino;
+  atualizarDashboardFinanceiro();
+}
+function voltarMesAtualDashboard(){
+  dashboardDataSelecionada=mesAtualDashboard();
+  atualizarDashboardFinanceiro();
+}
+
+function diasAteVencimento(dataISO){
+  if(!dataISO)return null;
+  const hoje=new Date();
+  hoje.setHours(0,0,0,0);
+  const venc=new Date(dataISO+'T12:00:00');
+  venc.setHours(0,0,0,0);
+  return Math.round((venc-hoje)/86400000);
+}
+
+function despesasComAlerta(){
+  garantirDespesasRecorrentesProximas();
+  return lerDespesas()
+    .filter(d=>d.status!=='Paga' && d.vencimento)
+    .map(d=>({...d,dias:diasAteVencimento(d.vencimento)}))
+    .filter(d=>d.dias!==null && d.dias>=0 && d.dias<=2)
+    .sort((a,b)=>a.dias-b.dias || String(a.vencimento).localeCompare(String(b.vencimento)));
+}
+
+function atualizarAlertaDespesasDashboard(){
+  const alertas=despesasComAlerta();
+  const card=document.getElementById('dashAlertaDespesasCard');
+  const qtd=document.getElementById('dashAlertasDespesas');
+  const txt=document.getElementById('dashAlertasDespesasTexto');
+
+  if(qtd)qtd.textContent=String(alertas.length);
+
+  if(card){
+    card.classList.toggle('has-alert',alertas.length>0);
+  }
+
+  if(txt){
+    if(!alertas.length){
+      txt.textContent='Nenhum vencimento próximo';
+    }else{
+      const hoje=alertas.filter(a=>a.dias===0).length;
+      const amanha=alertas.filter(a=>a.dias===1).length;
+      const dois=alertas.filter(a=>a.dias===2).length;
+      const partes=[];
+      if(hoje)partes.push(`${hoje} vence${hoje>1?'m':''} hoje`);
+      if(amanha)partes.push(`${amanha} amanhã`);
+      if(dois)partes.push(`${dois} em 2 dias`);
+      txt.textContent=partes.join(' • ');
+    }
+  }
+}
+
+function abrirAlertasDespesas(){
+  const box=document.getElementById('alertasDespesasLista');
+  const alertas=despesasComAlerta();
+
+  if(box){
+    if(!alertas.length){
+      box.innerHTML='<div class="finance-alert-empty">Nenhuma despesa vence nos próximos 2 dias.</div>';
+    }else{
+      box.innerHTML=alertas.map(d=>{
+        const classe=d.dias===0?'today':d.dias===1?'tomorrow':'';
+        const textoDias=d.dias===0?'Vence hoje':d.dias===1?'Vence amanhã':'Vence em 2 dias';
+        const vencimento=new Date(d.vencimento+'T12:00:00').toLocaleDateString('pt-BR');
+        return `<div class="finance-alert-item ${classe}">
+          <div>
+            <strong>${escapar(d.descricao||'Despesa')}</strong>
+            <small>${escapar(d.fornecedor||'Sem fornecedor')} • ${moedaFinance(d.valor||0)} • Vencimento ${vencimento}</small>
+          </div>
+          <div class="finance-alert-days">${textoDias}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  document.getElementById('alertasDespesasBackdrop')?.classList.add('show');
+}
+function fecharAlertasDespesas(){
+  document.getElementById('alertasDespesasBackdrop')?.classList.remove('show');
+}
+
+
+const RPRINT_META_LUCRO_KEY='rprint_meta_lucro_percentual_v1';
+
+function obterMetaLucroDashboard(){
+  const salvo=Number(localStorage.getItem(RPRINT_META_LUCRO_KEY));
+  return Number.isFinite(salvo) && salvo>=0 ? salvo : 150;
+}
+
+function salvarMetaLucroDashboard(valor){
+  let meta=Number(valor);
+  if(!Number.isFinite(meta) || meta<0)meta=150;
+  localStorage.setItem(RPRINT_META_LUCRO_KEY,String(meta));
+  const input=document.getElementById('metaLucroPercentual');
+  if(input)input.value=meta;
+  atualizarDashboardFinanceiro();
+}
+
+function atualizarMetaLucroDashboard(faturamentoMes,despesasMes){
+  const metaPct=obterMetaLucroDashboard();
+  const input=document.getElementById('metaLucroPercentual');
+  if(input)input.value=metaPct;
+
+  const receita=Number(faturamentoMes)||0;
+  const despesas=Number(despesasMes)||0;
+  const lucroAtual=receita-despesas;
+
+  // Regra adotada:
+  // Meta de lucro (%) = lucro desejado como percentual das despesas.
+  // Ex.: despesas de R$ 1.000 e meta de 150% => lucro desejado de R$ 1.500
+  // e faturamento necessário de R$ 2.500.
+  const lucroMeta=despesas*(metaPct/100);
+  const faturamentoMeta=despesas+lucroMeta;
+
+  let progresso;
+  if(lucroMeta<=0){
+    progresso=receita>0 ? 100 : 0;
+  }else{
+    progresso=(lucroAtual/lucroMeta)*100;
+  }
+  const progressoVisual=Math.max(0,Math.min(100,progresso));
+  const falta=Math.max(0,faturamentoMeta-receita);
+  const atingiu=falta<=0 && faturamentoMeta>0;
+
+  const el=(id)=>document.getElementById(id);
+  if(el('profitGoalReceita'))el('profitGoalReceita').textContent=moedaFinance(receita);
+  if(el('profitGoalDespesas'))el('profitGoalDespesas').textContent=moedaFinance(despesas);
+  if(el('profitGoalLucroAtual'))el('profitGoalLucroAtual').textContent=moedaFinance(lucroAtual);
+  if(el('profitGoalLucroMeta'))el('profitGoalLucroMeta').textContent=moedaFinance(lucroMeta);
+  if(el('profitGoalFaturamentoMeta'))el('profitGoalFaturamentoMeta').textContent=moedaFinance(faturamentoMeta);
+  if(el('profitGoalFalta'))el('profitGoalFalta').textContent=atingiu?'Meta atingida':moedaFinance(falta);
+  if(el('profitGoalFaltaLabel'))el('profitGoalFaltaLabel').textContent=atingiu?'Situação':'Falta faturar';
+
+  const ring=el('profitGoalRing');
+  if(ring){
+    const graus=progressoVisual*3.6;
+    ring.style.background=`conic-gradient(${atingiu?'#16a34a':'#7c3aed'} ${graus}deg,#eceaf2 ${graus}deg)`;
+  }
+  if(el('profitGoalPercent')){
+    el('profitGoalPercent').textContent=
+      `${Math.max(0,progresso).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+  }
+
+  const rem=document.querySelector('.profit-goal-row.remaining');
+  if(rem)rem.classList.toggle('achieved',atingiu);
+
+  if(el('profitGoalExplanation')){
+    if(despesas<=0){
+      el('profitGoalExplanation').textContent=
+        `Meta configurada em ${metaPct}% de lucro sobre as despesas. Cadastre ou marque despesas como pagas para calcular a meta do mês.`;
+    }else{
+      el('profitGoalExplanation').textContent=
+        `Com ${moedaFinance(despesas)} de despesas e meta de ${metaPct}% de lucro, o lucro desejado é ${moedaFinance(lucroMeta)}. Para isso, o faturamento do mês precisa chegar a ${moedaFinance(faturamentoMeta)}.`;
+    }
+  }
+}
+
+function atualizarDashboardFinanceiro(){
+  if(!dashboardDataSelecionada)dashboardDataSelecionada=mesAtualDashboard();
+
+  const sel=new Date(dashboardDataSelecionada.getFullYear(),dashboardDataSelecionada.getMonth(),1);
+  const atual=mesAtualDashboard();
+
+  // Proteção para não exibir meses futuros.
+  if(sel>atual)dashboardDataSelecionada=atual;
+
+  const ref=dashboardDataSelecionada;
+  garantirDespesasRecorrentesParaMes(ref);
+  atualizarNomeBotaoMesDashboard(ref);
+  const inicioMes=new Date(ref.getFullYear(),ref.getMonth(),1);
+  const fimMes=new Date(ref.getFullYear(),ref.getMonth()+1,0,23,59,59);
+  const inicioAno=new Date(ref.getFullYear(),0,1);
+  const fimAno=new Date(ref.getFullYear(),11,31,23,59,59);
+
+  const fatMes=pagamentosNoPeriodo(inicioMes,fimMes).reduce((s,p)=>s+Number(p.valor||0),0);
+  const fatAno=pagamentosNoPeriodo(inicioAno,fimAno).reduce((s,p)=>s+Number(p.valor||0),0);
+  const despMes=despesasPagasNoPeriodo(inicioMes,fimMes).reduce((s,d)=>s+Number(d.valor||0),0);
+
+  const pedidos=pedidosFinanceiros();
+  const aReceber=pedidos.reduce((s,p)=>s+saldoFinanceiroPedido(p),0);
+  const despesas=lerDespesas();
+  const aPagar=despesas.filter(d=>d.status!=='Paga').reduce((s,d)=>s+Number(d.valor||0),0);
+  const resultado=fatMes-despMes;
+
+  document.getElementById('dashFatMes').textContent=moedaFinance(fatMes);
+  document.getElementById('dashFatAno').textContent=moedaFinance(fatAno);
+  document.getElementById('dashAReceber').textContent=moedaFinance(aReceber);
+  document.getElementById('dashDespMes').textContent=moedaFinance(despMes);
+  document.getElementById('dashAPagar').textContent=moedaFinance(aPagar);
+  document.getElementById('dashResultado').textContent=moedaFinance(resultado);
+  atualizarMetaLucroDashboard(fatMes,despMes);
+
+  document.getElementById('dashQtdPendentes').textContent=pedidos.filter(p=>statusPagamentoPedido(p)!=='Pago').length;
+  document.getElementById('dashQtdDespesas').textContent=despesas.filter(d=>d.status!=='Paga').length;
+  document.getElementById('dashPedidosAbertos').textContent=pedidos.filter(p=>p.status!=='Entregue').length;
+
+  const input=document.getElementById('dashboardMesSelecionado');
+  if(input){
+    input.value=valorInputMesDashboard(ref);
+    input.max=valorInputMesDashboard(atual);
+  }
