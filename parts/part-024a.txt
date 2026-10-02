@@ -1,0 +1,250 @@
+  let a=0;
+  for(let i=0;i<pts.length;i++){
+    const j=(i+1)%pts.length;
+    a+=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1];
+  }
+  return Math.abs(a)/2;
+}
+function areaSvgElemento(el){
+  const tag=el.tagName.toLowerCase();
+  if(tag==='rect')return Math.abs((Number(el.getAttribute('width'))||0)*(Number(el.getAttribute('height'))||0));
+  if(tag==='circle'){const r=Number(el.getAttribute('r'))||0;return Math.PI*r*r}
+  if(tag==='ellipse'){const rx=Number(el.getAttribute('rx'))||0,ry=Number(el.getAttribute('ry'))||0;return Math.PI*rx*ry}
+  if(tag==='polygon')return areaPoligono(el.getAttribute('points'));
+  if(tag==='path' || tag==='text' || tag==='image'){
+    // Formas complexas: bbox é uma estimativa conservadora.
+    try{
+      const clone=el.cloneNode(true);
+      const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svg.style.position='fixed';svg.style.left='-10000px';svg.style.top='-10000px';
+      svg.appendChild(clone);document.body.appendChild(svg);
+      const b=clone.getBBox();
+      svg.remove();
+      return Math.abs(b.width*b.height);
+    }catch(e){return 0}
+  }
+  return 0;
+}
+
+async function analisarArquivoMaterial(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  document.getElementById('materialAnalyzerFileName').textContent=file.name;
+  const ext=(file.name.split('.').pop()||'').toLowerCase();
+
+  if(ext==='svg' || file.type==='image/svg+xml'){
+    materialAnalyzerMode='svg';
+    await analisarSvgMaterial(file);
+  }else{
+    materialAnalyzerMode='manual';
+    document.getElementById('materialAnalyzerResults').innerHTML='';
+    materialAnalyzerRows=[];
+    document.getElementById('materialAnalyzerInfo').textContent=
+      'Para PDF ou imagem, informe a largura e altura físicas do arquivo em centímetros e escolha o material.';
+    atualizarAnaliseManual();
+  }
+}
+
+async function analisarSvgMaterial(file){
+  const txt=await file.text();
+  const doc=new DOMParser().parseFromString(txt,'image/svg+xml');
+  const svg=doc.documentElement;
+  if(!svg || svg.tagName.toLowerCase()!=='svg'){
+    alert('Não foi possível interpretar este SVG.');
+    return;
+  }
+
+  const width=parseSvgLength(svg.getAttribute('width'));
+  const height=parseSvgLength(svg.getAttribute('height'));
+  const vb=(svg.getAttribute('viewBox')||'').trim().split(/\s+/).map(Number);
+
+  let scaleX=null,scaleY=null;
+  if(width && height && width.unit!=='px' && height.unit!=='px' && vb.length===4 && vb.every(Number.isFinite) && vb[2] && vb[3]){
+    const wm=unidadeSvgParaMetros(width.value,width.unit);
+    const hm=unidadeSvgParaMetros(height.value,height.unit);
+    if(wm!==null&&hm!==null){
+      scaleX=wm/vb[2];
+      scaleY=hm/vb[3];
+      document.getElementById('materialAnalyzerWidth').value=(wm*100).toFixed(2);
+      document.getElementById('materialAnalyzerHeight').value=(hm*100).toFixed(2);
+    }
+  }else if(width && height && width.unit!=='px' && height.unit!=='px'){
+    const wm=unidadeSvgParaMetros(width.value,width.unit);
+    const hm=unidadeSvgParaMetros(height.value,height.unit);
+    if(wm!==null&&hm!==null){
+      document.getElementById('materialAnalyzerWidth').value=(wm*100).toFixed(2);
+      document.getElementById('materialAnalyzerHeight').value=(hm*100).toFixed(2);
+      scaleX=wm/(width.value||1);
+      scaleY=hm/(height.value||1);
+    }
+  }
+
+  if(scaleX===null || scaleY===null){
+    document.getElementById('materialAnalyzerInfo').textContent=
+      'O SVG não possui unidade física confiável. Informe largura e altura em centímetros; as proporções serão usadas para converter as áreas.';
+    const totalVbArea=(vb.length===4&&vb[2]&&vb[3])?vb[2]*vb[3]:1;
+    materialAnalyzerRows=agruparCoresSvg(svg).map(r=>({...r,rawArea:r.rawArea,totalVbArea}));
+    renderAnaliseSvgSemEscala();
+    return;
+  }
+
+  const grupos=agruparCoresSvg(svg);
+  materialAnalyzerRows=grupos.map(r=>({
+    color:r.color,
+    areaM2:r.rawArea*scaleX*scaleY,
+    materialId:'',
+    cost:0
+  }));
+  document.getElementById('materialAnalyzerInfo').textContent=
+    `SVG analisado automaticamente por cor. Foram encontradas ${materialAnalyzerRows.length} cores preenchidas.`;
+  renderAnalyzerRows();
+}
+
+function agruparCoresSvg(svg){
+  const map={};
+  [...svg.querySelectorAll('rect,circle,ellipse,polygon,path,text,image')].forEach(el=>{
+    const color=corSvg(el);
+    if(!color)return;
+    const area=areaSvgElemento(el);
+    if(area<=0)return;
+    map[color]=(map[color]||0)+area;
+  });
+  return Object.entries(map).map(([color,rawArea])=>({color,rawArea}));
+}
+
+function renderAnaliseSvgSemEscala(){
+  atualizarSvgRowsComEscalaManual();
+}
+function atualizarSvgRowsComEscalaManual(){
+  const wcm=Number(document.getElementById('materialAnalyzerWidth').value)||0;
+  const hcm=Number(document.getElementById('materialAnalyzerHeight').value)||0;
+  const box=document.getElementById('materialAnalyzerResults');
+  if(materialAnalyzerMode!=='svg')return;
+  if(!materialAnalyzerRows.length){box.innerHTML='';return}
+
+  const totalRaw=materialAnalyzerRows.reduce((s,r)=>s+(r.rawArea||0),0);
+  if(totalRaw>0 && wcm>0 && hcm>0 && materialAnalyzerRows.some(r=>r.rawArea!==undefined && r.areaM2===undefined)){
+    const pageArea=(wcm/100)*(hcm/100);
+    materialAnalyzerRows.forEach(r=>{
+      r.areaM2=pageArea*((r.rawArea||0)/totalRaw);
+    });
+  }
+  renderAnalyzerRows();
+}
+
+function atualizarAnaliseManual(){
+  if(materialAnalyzerMode==='svg'){
+    atualizarSvgRowsComEscalaManual();
+    return;
+  }
+  const w=Number(document.getElementById('materialAnalyzerWidth').value)||0;
+  const h=Number(document.getElementById('materialAnalyzerHeight').value)||0;
+  const materialId=document.getElementById('materialAnalyzerMaterial').value;
+  const area=(w/100)*(h/100);
+  materialAnalyzerRows=area>0?[{color:'#cbd5e1',areaM2:area,materialId,cost:0}]:[];
+  renderAnalyzerRows(true);
+}
+
+function analyzerMaterialChanged(index,value){
+  if(!materialAnalyzerRows[index])return;
+  materialAnalyzerRows[index].materialId=value;
+  recalcularCustosAnalyzer();
+}
+
+function renderAnalyzerRows(manual=false){
+  const box=document.getElementById('materialAnalyzerResults');
+  const materiais=lerMateriais();
+  if(!materialAnalyzerRows.length){
+    box.innerHTML='';
+    document.getElementById('materialAnalyzerTotal').textContent=moedaMaterial(0);
+    return;
+  }
+  box.innerHTML=materialAnalyzerRows.map((r,i)=>{
+    const opts='<option value="">Escolha o material...</option>'+
+      materiais.map(m=>`<option value="${m.id}" ${String(r.materialId)===String(m.id)?'selected':''}>${escapar(m.nome)}</option>`).join('');
+    return `<div class="analyzer-row">
+      <div class="analyzer-color" style="background:${escapar(r.color||'#cbd5e1')}"></div>
+      <div><strong>${manual?'Área do arquivo':escapar(r.color||'Cor')}</strong></div>
+      <div><select class="analyzer-material-select" onchange="analyzerMaterialChanged(${i},this.value)">${opts}</select></div>
+      <div class="analyzer-area"><span>${(Number(r.areaM2)||0).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})} m²</span></div>
+      <div class="analyzer-cost"><strong id="analyzerCost${i}">R$ 0,00</strong></div>
+    </div>`;
+  }).join('');
+  recalcularCustosAnalyzer();
+}
+
+function recalcularCustosAnalyzer(){
+  const materiais=lerMateriais();
+  let total=0;
+  materialAnalyzerRows.forEach((r,i)=>{
+    const m=materiais.find(x=>String(x.id)===String(r.materialId));
+    let custo=0;
+    if(m){
+      if(m.unidade==='m2')custo=(Number(r.areaM2)||0)*(Number(m.custo)||0);
+      else if(m.unidade==='un')custo=Number(m.custo)||0;
+      // Outras unidades não podem ser inferidas do arquivo automaticamente.
+    }
+    r.cost=custo;
+    total+=custo;
+    const el=document.getElementById('analyzerCost'+i);
+    if(el)el.textContent=moedaMaterial(custo);
+  });
+  document.getElementById('materialAnalyzerTotal').textContent=moedaMaterial(total);
+}
+
+function usarCustoMateriaisNoProduto(){
+  recalcularCustosAnalyzer();
+  const total=materialAnalyzerRows.reduce((s,r)=>s+(Number(r.cost)||0),0);
+  if(total<=0){
+    alert('Associe os materiais às áreas analisadas antes de usar o custo.');
+    return;
+  }
+  const custo=document.getElementById('custoProducao');
+  if(custo){
+    custo.value=total.toFixed(2);
+    custo.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  fecharAnalisadorMateriais();
+}
+</script>
+
+
+<div id="laserConfigBackdrop" class="laser-config-backdrop">
+  <div class="laser-config-modal">
+    <div class="laser-config-head">
+      <div>
+        <h3>Configurações da máquina laser</h3>
+        <p>Valores padrão usados na calculadora.</p>
+      </div>
+      <button type="button" onclick="fecharConfiguracaoLaser()">×</button>
+    </div>
+    <div class="laser-config-body">
+      <div class="laser-grid">
+        <div class="field"><label>Valor da máquina</label><div class="laser-money"><span>R$</span><input id="laserCfgMaquina" type="number" min="0" step="0.01"></div></div>
+        <div class="field"><label>Valor médio do tubo</label><div class="laser-money"><span>R$</span><input id="laserCfgTubo" type="number" min="0" step="0.01"></div></div>
+        <div class="field"><label>Uso médio por dia (h)</label><input id="laserCfgHorasDia" type="number" min="0" step="0.1"></div>
+        <div class="field"><label>Valor cobrado por minuto</label><div class="laser-money"><span>R$</span><input id="laserCfgMinuto" type="number" min="0" step="0.01"></div></div>
+        <div class="field"><label>Taxa mínima serviço pequeno</label><div class="laser-money"><span>R$</span><input id="laserCfgTaxaMinima" type="number" min="0" step="0.01"></div></div>
+        <div class="field"><label>Velocidade de corte (mm/s)</label><input id="laserCfgVelCorte" type="number" min="1" step="1"></div>
+        <div class="field"><label>Velocidade de gravação (mm/s)</label><input id="laserCfgVelGravacao" type="number" min="1" step="1"></div>
+        <div class="field"><label>Intervalo de gravação (mm)</label><input id="laserCfgIntervaloGravacao" type="number" min="0.01" step="0.01"></div>
+      </div>
+    </div>
+    <div class="laser-config-footer">
+      <button class="btn btn-light" type="button" onclick="fecharConfiguracaoLaser()">Cancelar</button>
+      <button class="btn btn-primary" type="button" onclick="salvarConfiguracaoLaser()">Salvar configurações</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const RPRINT_LASER_CFG_KEY='rprint_laser_config_v1';
+const RPRINT_LASER_CFG_PADRAO={maquina:37000,tubo:3500,horasDia:6,valorMinuto:1.50,taxaMinima:15,velCorte:20,velGravacao:300,intervaloGravacao:0.10};
+
+function lerCfgLaser(){
+  try{
+    const x=JSON.parse(localStorage.getItem(RPRINT_LASER_CFG_KEY)||'null');
+    return {...RPRINT_LASER_CFG_PADRAO,...(x||{})};
+  }catch(e){return {...RPRINT_LASER_CFG_PADRAO}}
+}
