@@ -1,0 +1,500 @@
+  document.getElementById('pqData').textContent=
+    'Data de Emissão: '+agora.toLocaleDateString('pt-BR')+' - '+
+    agora.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('pqCliente').innerHTML=`<span class="print-icon"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg></span>`+escapar(cliente);
+  document.getElementById('pqContato').innerHTML=`<span class="print-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8.5 7.5c.5 4.5 3.5 7.5 8 8M8.2 7.2l2 3M16.8 15.8l-3-2M5 20l1.2-4"/></svg></span>`+escapar(contato);
+  document.getElementById('pqObs').textContent=observacoes || '';
+
+  const tbody=document.getElementById('pqProdutos');
+  if(produtos.length===0){
+    tbody.innerHTML='<tr><td colspan="4">Nenhum produto adicionado</td></tr>';
+  }else{
+    tbody.innerHTML=produtos.map(p=>{
+      const precoUnitarioPdf = p.calculoArea ? (Number(p.total)||0) : (Number(p.venda)||0);
+      return `
+      <tr>
+        <td>${escapar(p.descricao)}</td>
+        <td>${moeda(precoUnitarioPdf)}</td>
+        <td class="num">${p.qtd}</td>
+        <td>${moeda(p.total)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('pqSubtotal').textContent=moeda(subtotal);
+  document.getElementById('pqTotal').textContent=moeda(subtotal);
+
+  // Usa o título da página como nome sugerido do PDF.
+  // Exemplo: Prefeitura ODC - N-24
+  const tituloAnterior=document.title;
+
+  const nomeClienteArquivo=(cliente || 'Cliente')
+    .replace(/[\\/:*?"<>|]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  const numeroArquivo=(numero || 'Orcamento')
+    .replace(/[\\/:*?"<>|]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  document.title=`${nomeClienteArquivo} - ${numeroArquivo}`;
+
+  const restaurarTitulo=()=>{ document.title=tituloAnterior; };
+  window.addEventListener('afterprint',restaurarTitulo,{once:true});
+
+  setTimeout(()=>window.print(),100);
+}
+
+
+
+const ORCAMENTOS_LOCAL_KEY='rprint_orcamentos_v2';
+let orcamentoEditandoId=null;
+
+function lerOrcamentosLocal(){
+  try{
+    const dados=JSON.parse(localStorage.getItem(ORCAMENTOS_LOCAL_KEY)||'[]');
+    return Array.isArray(dados)?dados:[];
+  }catch(e){
+    return [];
+  }
+}
+function gravarOrcamentosLocal(lista){
+  localStorage.setItem(ORCAMENTOS_LOCAL_KEY,JSON.stringify(lista));
+}
+async function dbPut(item){
+  const lista=lerOrcamentosLocal();
+
+  if(item.id){
+    const id=Number(item.id);
+    const i=lista.findIndex(x=>Number(x.id)===id);
+    if(i>=0){
+      lista[i]={...item,id};
+    }else{
+      lista.push({...item,id});
+    }
+    gravarOrcamentosLocal(lista);
+    return id;
+  }
+
+  const id=Date.now();
+  lista.push({...item,id});
+  gravarOrcamentosLocal(lista);
+  return id;
+}
+async function dbGetAll(){
+  return lerOrcamentosLocal();
+}
+async function dbGet(id){
+  return lerOrcamentosLocal().find(x=>Number(x.id)===Number(id))||null;
+}
+async function dbDelete(id){
+  const lista=lerOrcamentosLocal().filter(x=>Number(x.id)!==Number(id));
+  gravarOrcamentosLocal(lista);
+}
+
+
+function mostrarAcoesOrcamentoTopbar(mostrar){
+  const el=document.getElementById('orcamentoTopActions');
+  if(el)el.classList.toggle('rprint-show',!!mostrar);
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+}
+function setNav(active){
+  document.getElementById('navNovo').classList.toggle('active',active==='novo');
+  document.getElementById('navSalvos').classList.toggle('active',active==='salvos');
+}
+function mostrarNovoOrcamento(){
+  document.getElementById('mainTopbar').style.display='';
+  document.getElementById('mainQuote').style.display='';
+  document.getElementById('savedPanel').classList.remove('show');
+  mostrarAcoesOrcamentoTopbar(true);
+  setNav('novo');
+}
+async function mostrarOrcamentosSalvos(){
+  document.getElementById('mainTopbar').style.display='';
+  document.getElementById('mainQuote').style.display='none';
+  document.getElementById('savedPanel').classList.add('show');
+  mostrarAcoesOrcamentoTopbar(false);
+  setNav('salvos');
+  await renderizarHistorico();
+}
+function limparFormularioCompleto(){
+  document.getElementById('cliente').value='';
+  document.getElementById('contato').value='';
+  document.getElementById('numeroOrcamento').value='N-1';
+  const obs=document.getElementById('observacoes');
+  if(obs) obs.value='';
+  produtos=[];
+  orcamentoEditandoId=null;
+  renderProdutos();
+}
+async function salvarOrcamentoHistorico(){
+  const cliente=document.getElementById('cliente').value.trim();
+  const contato=document.getElementById('contato').value.trim();
+  const numero=document.getElementById('numeroOrcamento').value.trim() || 'N-1';
+  const observacoes=(document.getElementById('observacoes')?.value||'').trim();
+  const subtotal=produtos.reduce((s,p)=>s+(Number(p.total)||0),0);
+
+  if(!cliente && produtos.length===0){
+    alert('Preencha o cliente ou adicione pelo menos um produto antes de salvar.');
+    return;
+  }
+
+  const agora=new Date().toISOString();
+  let criadoEm=agora;
+
+  if(orcamentoEditandoId){
+    const antigo=await dbGet(orcamentoEditandoId);
+    if(antigo?.criadoEm) criadoEm=antigo.criadoEm;
+  }
+
+  const item={
+    id:orcamentoEditandoId||undefined,
+    numero,
+    cliente,
+    contato,
+    observacoes,
+    produtos:JSON.parse(JSON.stringify(produtos)),
+    subtotal,
+    total:subtotal,
+    criadoEm,
+    atualizadoEm:agora
+  };
+
+  try{
+    const id=await dbPut(item);
+    orcamentoEditandoId=id;
+    await renderizarHistorico();
+    alert('Orçamento salvo com sucesso!');
+  }catch(e){
+    console.error(e);
+    alert('Não foi possível salvar o orçamento neste navegador.');
+  }
+}
+async function renderizarHistorico(){
+  const list=document.getElementById('savedList');
+  if(!list) return;
+  let itens=await dbGetAll();
+  itens.sort((a,b)=>String(b.atualizadoEm||'').localeCompare(String(a.atualizadoEm||'')));
+
+  const totalSalvos=itens.length;
+  const q=(document.getElementById('historySearch')?.value||'').trim().toLowerCase();
+  if(q){
+    itens=itens.filter(x=>
+      String(x.numero||'').toLowerCase().includes(q) ||
+      String(x.cliente||'').toLowerCase().includes(q) ||
+      String(x.contato||'').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('historyCount').textContent=
+    `${totalSalvos} ${totalSalvos===1?'orçamento':'orçamentos'}`;
+
+  if(!itens.length){
+    list.innerHTML='<div class="empty-history">Nenhum orçamento salvo ainda.</div>';
+    return;
+  }
+
+  list.innerHTML=`
+    <div class="saved-row header">
+      <div>Número</div><div>Cliente</div><div>Atualizado</div><div>Total</div><div style="text-align:right">Ações</div>
+    </div>`+
+    itens.map(x=>{
+      const data=x.atualizadoEm ? new Date(x.atualizadoEm).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : '-';
+      return `<div class="saved-row">
+        <div><strong>${escapar(x.numero||'-')}</strong></div>
+        <div class="saved-client"><strong>${escapar(x.cliente||'Cliente não informado')}</strong><small>${escapar(x.contato||'')}</small></div>
+        <div>${data}</div>
+        <div><strong>${moeda(x.total||0)}</strong></div>
+        <div class="saved-actions">
+          <button class="btn btn-secondary" onclick="editarOrcamentoSalvo(${x.id})">Editar</button>
+          <button class="btn btn-outline" onclick="duplicarOrcamento(${x.id})">Duplicar</button>
+          <button class="btn btn-danger" onclick="excluirOrcamento(${x.id})">Excluir</button>
+          <button class="btn btn-whatsapp" onclick="enviarOrcamentoWhatsApp(${x.id})">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M8.5 7.5c.5 4.5 3.5 7.5 8 8"></path>
+              <path d="M8.2 7.2l2 3M16.8 15.8l-3-2"></path>
+              <path d="M5 20l1.2-4"></path>
+            </svg>
+            WhatsApp
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+}
+async function editarOrcamentoSalvo(id){
+  const x=await dbGet(id);
+  if(!x) return;
+  document.getElementById('cliente').value=x.cliente||'';
+  document.getElementById('contato').value=x.contato||'';
+  document.getElementById('numeroOrcamento').value=x.numero||'N-1';
+  const obs=document.getElementById('observacoes');
+  if(obs) obs.value=x.observacoes||'';
+  produtos=Array.isArray(x.produtos)?JSON.parse(JSON.stringify(x.produtos)):[];
+  orcamentoEditandoId=x.id;
+  renderProdutos();
+  mostrarNovoOrcamento();
+}
+async function duplicarOrcamento(id){
+  const x=await dbGet(id);
+  if(!x) return;
+  const novo={
+    numero:(x.numero||'N-1')+' - Cópia',
+    cliente:x.cliente||'',
+    contato:x.contato||'',
+    observacoes:x.observacoes||'',
+    produtos:Array.isArray(x.produtos)?JSON.parse(JSON.stringify(x.produtos)):[],
+    subtotal:Number(x.subtotal)||0,
+    total:Number(x.total)||0,
+    criadoEm:new Date().toISOString(),
+    atualizadoEm:new Date().toISOString()
+  };
+  await dbPut(novo);
+  await renderizarHistorico();
+}
+async function excluirOrcamento(id){
+  if(!confirm('Deseja excluir este orçamento salvo?')) return;
+  await dbDelete(id);
+  if(orcamentoEditandoId===id) orcamentoEditandoId=null;
+  await renderizarHistorico();
+}
+
+
+let clienteEditandoId=null;
+let clientesCache=[];
+
+const CLIENTS_LOCAL_KEY='rprint_clientes_v1';
+
+function lerClientesLocal(){
+  try{
+    const dados=JSON.parse(localStorage.getItem(CLIENTS_LOCAL_KEY)||'[]');
+    return Array.isArray(dados)?dados:[];
+  }catch(e){
+    return [];
+  }
+}
+function gravarClientesLocal(lista){
+  localStorage.setItem(CLIENTS_LOCAL_KEY,JSON.stringify(lista));
+}
+async function clientPut(item){
+  const lista=lerClientesLocal();
+  if(item.id){
+    const i=lista.findIndex(c=>Number(c.id)===Number(item.id));
+    if(i>=0){
+      lista[i]={...item,id:Number(item.id)};
+    }else{
+      lista.push({...item,id:Number(item.id)});
+    }
+    gravarClientesLocal(lista);
+    return Number(item.id);
+  }
+
+  const id=Date.now();
+  lista.push({...item,id});
+  gravarClientesLocal(lista);
+  return id;
+}
+async function clientGetAll(){
+  return lerClientesLocal();
+}
+async function clientGet(id){
+  return lerClientesLocal().find(c=>Number(c.id)===Number(id))||null;
+}
+async function clientDelete(id){
+  const lista=lerClientesLocal().filter(c=>Number(c.id)!==Number(id));
+  gravarClientesLocal(lista);
+}
+
+async function carregarClientesCache(){
+  clientesCache=await clientGetAll();
+  clientesCache.sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+}
+
+function mostrarClientes(){
+  document.getElementById('mainTopbar').style.display='none';
+  document.getElementById('mainQuote').style.display='none';
+  document.getElementById('savedPanel').classList.remove('show');
+  document.getElementById('clientsPanel').classList.add('show');
+  setNav('clientes');
+  renderizarClientes();
+}
+
+const oldMostrarNovo=mostrarNovoOrcamento;
+mostrarNovoOrcamento=function(){
+  document.getElementById('clientsPanel').classList.remove('show');
+  oldMostrarNovo();
+};
+
+const oldMostrarSalvos=mostrarOrcamentosSalvos;
+mostrarOrcamentosSalvos=async function(){
+  document.getElementById('clientsPanel').classList.remove('show');
+  await oldMostrarSalvos();
+};
+
+const oldSetNav=setNav;
+setNav=function(active){
+  oldSetNav(active);
+  document.getElementById('navClientes').classList.toggle('active',active==='clientes');
+};
+
+function abrirFormularioCliente(){
+  clienteEditandoId=null;
+  document.getElementById('cadClienteNome').value='';
+  document.getElementById('cadClienteContato').value='';
+  document.getElementById('clientFormWrap').classList.add('show');
+  setTimeout(()=>document.getElementById('cadClienteNome').focus(),50);
+}
+function fecharFormularioCliente(){
+  clienteEditandoId=null;
+  document.getElementById('clientFormWrap').classList.remove('show');
+}
+async function salvarCliente(){
+  const nome=document.getElementById('cadClienteNome').value.trim();
+  const contato=document.getElementById('cadClienteContato').value.trim();
+
+  if(!nome){
+    alert('Digite o nome do cliente.');
+    return;
+  }
+
+  const agora=new Date().toISOString();
+  let criadoEm=agora;
+  if(clienteEditandoId){
+    const antigo=await clientGet(clienteEditandoId);
+    if(antigo?.criadoEm) criadoEm=antigo.criadoEm;
+  }
+
+  await clientPut({
+    id:clienteEditandoId||undefined,
+    nome,
+    contato,
+    criadoEm,
+    atualizadoEm:agora
+  });
+
+  fecharFormularioCliente();
+  await carregarClientesCache();
+  await renderizarClientes();
+  alert('Cliente salvo com sucesso!');
+}
+async function editarCliente(id){
+  const c=await clientGet(id);
+  if(!c) return;
+  clienteEditandoId=c.id;
+  document.getElementById('cadClienteNome').value=c.nome||'';
+  document.getElementById('cadClienteContato').value=c.contato||'';
+  document.getElementById('clientFormWrap').classList.add('show');
+  setTimeout(()=>document.getElementById('cadClienteNome').focus(),50);
+}
+async function excluirCliente(id){
+  if(!confirm('Deseja excluir este cliente?')) return;
+  await clientDelete(id);
+  await carregarClientesCache();
+  await renderizarClientes();
+}
+async function renderizarClientes(){
+  await carregarClientesCache();
+  const list=document.getElementById('clientsList');
+  if(!list) return;
+
+  let itens=[...clientesCache];
+  const q=(document.getElementById('clientsSearch')?.value||'').trim().toLowerCase();
+  if(q){
+    itens=itens.filter(c=>
+      String(c.nome||'').toLowerCase().includes(q) ||
+      String(c.contato||'').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('clientsCount').textContent=
+    `${itens.length} ${itens.length===1?'cliente':'clientes'}`;
+
+  if(!itens.length){
+    list.innerHTML='<div class="empty-history">Nenhum cliente cadastrado ainda.</div>';
+    return;
+  }
+
+  const pagina=paginarLista(itens,'clientes');
+
+  list.innerHTML=`
+    <div class="client-row header">
+      <div>Nome do Cliente</div><div>Contato</div><div style="text-align:right">Ações</div>
+    </div>`+
+    pagina.itens.map(c=>`
+      <div class="client-row">
+        <div><strong>${escapar(c.nome||'')}</strong></div>
+        <div>${escapar(c.contato||'-')}</div>
+        <div class="client-actions">
+          <button class="btn btn-secondary" onclick="editarCliente(${c.id})">Editar</button>
+          <button class="btn btn-danger" onclick="excluirCliente(${c.id})">Excluir</button>
+        </div>
+      </div>`).join('')+htmlPaginacaoLista('clientes',pagina,'renderizarClientes');
+}
+
+async function mostrarSugestoesClientes(){
+  if(!clientesCache.length) await carregarClientesCache();
+
+  const input=document.getElementById('cliente');
+  const box=document.getElementById('clientSuggestions');
+  const q=(input.value||'').trim().toLowerCase();
+
+  if(!q){
+    box.classList.remove('show');
+    box.innerHTML='';
+    return;
+  }
+
+  const achados=clientesCache
+    .filter(c=>String(c.nome||'').toLowerCase().startsWith(q))
+    .slice(0,8);
+
+  if(!achados.length){
+    box.classList.remove('show');
+    box.innerHTML='';
+    return;
+  }
+
+  box.innerHTML=achados.map(c=>`
+    <button type="button" class="client-suggestion" onclick="selecionarCliente(${c.id})">
+      <strong>${escapar(c.nome||'')}</strong>
+      <small>${escapar(c.contato||'Sem contato cadastrado')}</small>
+    </button>
+  `).join('');
+  box.classList.add('show');
+}
+
+async function selecionarCliente(id){
+  const c=clientesCache.find(x=>x.id===Number(id)) || await clientGet(id);
+  if(!c) return;
+  document.getElementById('cliente').value=c.nome||'';
+  document.getElementById('contato').value=c.contato||'';
+  const box=document.getElementById('clientSuggestions');
+  box.classList.remove('show');
+  box.innerHTML='';
+}
+
+document.addEventListener('click',e=>{
+  const wrap=e.target.closest('.autocomplete-wrap');
+  if(!wrap){
+    const box=document.getElementById('clientSuggestions');
+    if(box) box.classList.remove('show');
+  }
+});
+
+carregarClientesCache();
+
+
+const PRODUCTS_LOCAL_KEY='rprint_produtos_medida_v1';
+let produtoMedidaEditandoId=null;
+
+function lerProdutosMedida(){
+  try{
+    const x=JSON.parse(localStorage.getItem(PRODUCTS_LOCAL_KEY)||'[]');
+    return Array.isArray(x)?x:[];
+  }catch(e){return []}
+}
+function gravarProdutosMedida(lista){
