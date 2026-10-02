@@ -1,0 +1,500 @@
+
+      <div class="local-user-profile-note">
+        A foto fica salva somente neste navegador e vinculada a este usuário.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ===== PROTEÇÃO DAS JANELAS DE CADASTRO =====
+   Não existe temporizador de fechamento automático nesta versão.
+   Também bloqueamos fechamentos acidentais por clique no fundo ou tecla Escape.
+*/
+window.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    const algumModalAberto=[
+      'modalBackdrop','produtoM2Backdrop','localUsersBackdrop',
+      'localUserProfileBackdrop','pagamentoModalBackdrop',
+      'despesaModalBackdrop','localChangeAccessBackdrop'
+    ].some(id=>document.getElementById(id)?.classList.contains('show'));
+
+    if(algumModalAberto){
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+},true);
+</script>
+
+
+<div id="alertasDespesasBackdrop" class="finance-modal-backdrop" onclick="if(event.target===this)fecharAlertasDespesas()">
+  <div class="finance-modal finance-alert-modal">
+    <div class="finance-modal-head">
+      <div>
+        <h3>Alertas de despesas</h3>
+        <p>Contas que vencem hoje, amanhã ou em até 2 dias.</p>
+      </div>
+      <button type="button" onclick="fecharAlertasDespesas()">×</button>
+    </div>
+    <div class="finance-modal-body">
+      <div id="alertasDespesasLista" class="finance-alert-list"></div>
+    </div>
+    <div class="finance-modal-footer">
+      <button type="button" class="btn btn-light" onclick="fecharAlertasDespesas()">Fechar</button>
+      <button type="button" class="btn btn-primary" onclick="fecharAlertasDespesas();mostrarDespesas()">Abrir Despesas</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="alertasEntregasBackdrop" class="finance-modal-backdrop" onclick="if(event.target===this)fecharAlertasEntregas()">
+  <div class="finance-modal delivery-alert-modal">
+    <div class="finance-modal-head">
+      <div>
+        <h3>Entregas próximas</h3>
+        <p>Pedidos com entrega prevista para hoje, amanhã, em até 2 dias ou em atraso.</p>
+      </div>
+      <button type="button" onclick="fecharAlertasEntregas()">×</button>
+    </div>
+    <div class="finance-modal-body">
+      <div id="alertasEntregasLista" class="delivery-alert-list"></div>
+    </div>
+    <div class="finance-modal-footer">
+      <button type="button" class="btn btn-light" onclick="fecharAlertasEntregas()">Fechar</button>
+      <button type="button" class="btn btn-primary" onclick="fecharAlertasEntregas();mostrarPedidos()">Abrir Pedidos</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+<div id="materialModalBackdrop" class="materials-modal-backdrop">
+  <div class="materials-modal">
+    <div class="materials-modal-head">
+      <div>
+        <h3 id="materialModalTitle">Novo material</h3>
+        <p>Informe o custo de compra do material.</p>
+      </div>
+      <button type="button" onclick="fecharMaterialModal()">×</button>
+    </div>
+    <div class="materials-modal-body">
+      <input id="materialId" type="hidden">
+      <div class="materials-form-grid">
+        <div class="field full">
+          <label>Nome do material</label>
+          <input id="materialNome" placeholder="Ex.: PVC Expandido 2mm">
+        </div>
+        <div class="field">
+          <label>Unidade de cálculo</label>
+          <select id="materialUnidade" onchange="atualizarCalculoMaterialModal()">
+            <option value="m2">m²</option>
+            <option value="m">Metro linear</option>
+            <option value="un">Unidade</option>
+            <option value="ml">mL</option>
+            <option value="g">Grama</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Valor da peça inteira</label>
+          <div class="materials-money"><span>R$</span><input id="materialValorPeca" type="number" min="0" step="0.01" oninput="atualizarCalculoMaterialModal()"></div>
+        </div>
+
+        <div class="field">
+          <label id="materialLarguraLabel">Largura do material (m)</label>
+          <input id="materialLargura" type="number" min="0" step="0.001" placeholder="Ex.: 1,22" oninput="atualizarCalculoMaterialModal()">
+        </div>
+
+        <div class="field" id="materialAlturaField">
+          <label>Altura / comprimento (m)</label>
+          <input id="materialAltura" type="number" min="0" step="0.001" placeholder="Ex.: 2,44" oninput="atualizarCalculoMaterialModal()">
+        </div>
+
+        <div class="field">
+          <label id="materialQtdMetrosLabel">Quantidade de metros</label>
+          <input id="materialQtdMetros" type="number" min="0" step="0.001" placeholder="Ex.: 10" oninput="atualizarCalculoMaterialModal()">
+        </div>
+
+        <div class="field">
+          <label>Custo calculado por unidade</label>
+          <div class="materials-money materials-money-readonly"><span>R$</span><input id="materialCusto" type="number" min="0" step="0.01" readonly></div>
+        </div>
+
+        <div id="materialRoloAjuda" class="field full material-roll-help">
+          Para fita/rolo em <strong>Metro linear</strong>, informe a largura em <strong>milímetros</strong>, o comprimento total do rolo em metros e o valor do rolo inteiro. Ex.: 19 mm • 20 m.
+        </div>
+
+        <div class="field full">
+          <div class="material-calculo-resumo">
+            <div><span>Área da peça</span><strong id="materialAreaPeca">0,0000 m²</strong></div>
+            <div><span>Área total informada</span><strong id="materialAreaTotal">0,0000 m²</strong></div>
+            <div><span>Custo por m²</span><strong id="materialCustoM2">R$ 0,00</strong></div>
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>Observações</label>
+          <textarea id="materialObs" rows="3" placeholder="Opcional"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="materials-modal-footer">
+      <button class="btn btn-light" type="button" onclick="fecharMaterialModal()">Cancelar</button>
+      <button class="btn btn-primary" type="button" onclick="salvarMaterial()">Salvar material</button>
+    </div>
+  </div>
+</div>
+
+<div id="materialAnalyzerBackdrop" class="materials-modal-backdrop analyzer-backdrop">
+  <div class="materials-modal analyzer-modal">
+    <div class="materials-modal-head">
+      <div>
+        <h3>Analisar materiais do arquivo</h3>
+        <p>SVG pode ser analisado por cores. PDF e imagens usam as medidas informadas.</p>
+      </div>
+      <button type="button" onclick="fecharAnalisadorMateriais()">×</button>
+    </div>
+
+    <div class="materials-modal-body">
+      <div class="analyzer-upload">
+        <input id="materialAnalyzerFile" type="file" accept=".svg,.pdf,image/*" onchange="analisarArquivoMaterial(event)">
+        <div>
+          <strong id="materialAnalyzerFileName">Nenhum arquivo selecionado</strong>
+          <small>Para maior precisão automática, prefira SVG com medidas reais.</small>
+        </div>
+      </div>
+
+      <div id="materialAnalyzerManual" class="analyzer-manual">
+        <div class="field">
+          <label>Largura do arquivo (cm)</label>
+          <input id="materialAnalyzerWidth" type="number" min="0" step="0.01" oninput="atualizarAnaliseManual()">
+        </div>
+        <div class="field">
+          <label>Altura do arquivo (cm)</label>
+          <input id="materialAnalyzerHeight" type="number" min="0" step="0.01" oninput="atualizarAnaliseManual()">
+        </div>
+        <div class="field">
+          <label>Material</label>
+          <select id="materialAnalyzerMaterial" onchange="atualizarAnaliseManual()"></select>
+        </div>
+      </div>
+
+      <div id="materialAnalyzerInfo" class="analyzer-info">
+        Selecione um arquivo para iniciar a análise.
+      </div>
+
+      <div id="materialAnalyzerResults" class="analyzer-results"></div>
+
+      <div class="analyzer-summary">
+        <span>Custo total estimado de materiais</span>
+        <strong id="materialAnalyzerTotal">R$ 0,00</strong>
+      </div>
+
+      <div class="analyzer-warning">
+        A análise de SVG calcula áreas geométricas por cor. Formas complexas podem gerar uma estimativa. Para PDF/imagem, informe a medida física do arquivo e escolha o material.
+      </div>
+    </div>
+
+    <div class="materials-modal-footer">
+      <button class="btn btn-light" type="button" onclick="fecharAnalisadorMateriais()">Fechar</button>
+      <button class="btn btn-primary" type="button" onclick="usarCustoMateriaisNoProduto()">Usar custo no produto</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ===== MATERIAIS E ANALISADOR DE ARQUIVOS ===== */
+const RPRINT_MATERIAIS_KEY='rprint_materiais_v1';
+let materialAnalyzerRows=[];
+let materialAnalyzerMode='manual';
+
+function lerMateriais(){
+  try{
+    const x=JSON.parse(localStorage.getItem(RPRINT_MATERIAIS_KEY)||'[]');
+    return Array.isArray(x)?x:[];
+  }catch(e){return[]}
+}
+function gravarMateriais(lista){
+  localStorage.setItem(RPRINT_MATERIAIS_KEY,JSON.stringify(lista));
+}
+function unidadeMaterialLabel(u){
+  return ({m2:'m²',m:'m linear',un:'unidade',ml:'mL',g:'g'})[u]||u;
+}
+function moedaMaterial(v){
+  return (Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+
+function esconderMateriais(){
+  document.getElementById('materiaisPanel')?.classList.remove('show');
+}
+window.mostrarMateriais=function(){
+  const home=document.getElementById('homePanel');
+  const quote=document.getElementById('mainQuote');
+  if(home)home.style.display='none';
+  if(quote)quote.style.display='none';
+
+  ['savedPanel','pedidosPanel','clientsPanel','productsAdminPanel','backupPanel',
+   'dashboardFinanceiroPanel','pagamentosPanel','despesasPanel','minhaEmpresaPanel']
+   .forEach(id=>document.getElementById(id)?.classList.remove('show'));
+
+  document.getElementById('materiaisPanel')?.classList.add('show');
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('navMateriais')?.classList.add('active');
+  renderMateriais();
+};
+
+window.addEventListener('load',()=>{
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn=>{
+    if(btn.id!=='navMateriais')btn.addEventListener('click',esconderMateriais);
+  });
+});
+
+function abrirMaterialModal(id){
+  const lista=lerMateriais();
+  const m=id?lista.find(x=>Number(x.id)===Number(id)):null;
+  document.getElementById('materialId').value=m?.id||'';
+  document.getElementById('materialNome').value=m?.nome||'';
+  document.getElementById('materialUnidade').value=m?.unidade||'m2';
+  document.getElementById('materialValorPeca').value=m?.valorPeca??'';
+  const unidadeAbrir=m?.unidade||'m2';
+  document.getElementById('materialLargura').value=
+    unidadeAbrir==='m' && Number(m?.largura)>0 ? (Number(m.largura)*1000) : (m?.largura??'');
+  document.getElementById('materialAltura').value=m?.altura??'';
+  document.getElementById('materialQtdMetros').value=m?.qtdMetros??'';
+  document.getElementById('materialCusto').value=m?.custo??'';
+  document.getElementById('materialObs').value=m?.obs||'';
+  document.getElementById('materialModalTitle').textContent=m?'Editar material':'Novo material';
+  atualizarCalculoMaterialModal();
+  document.getElementById('materialModalBackdrop')?.classList.add('show');
+}
+function fecharMaterialModal(){
+  document.getElementById('materialModalBackdrop')?.classList.remove('show');
+}
+
+function atualizarCalculoMaterialModal(){
+  const unidade=document.getElementById('materialUnidade')?.value||'m2';
+  const valorPeca=Number(document.getElementById('materialValorPeca')?.value)||0;
+  const larguraDigitada=Number(document.getElementById('materialLargura')?.value)||0;
+  const altura=Number(document.getElementById('materialAltura')?.value)||0;
+  const qtdMetros=Number(document.getElementById('materialQtdMetros')?.value)||0;
+
+  const labelLargura=document.getElementById('materialLarguraLabel');
+  const labelQtd=document.getElementById('materialQtdMetrosLabel');
+  const alturaField=document.getElementById('materialAlturaField');
+  const ajuda=document.getElementById('materialRoloAjuda');
+  const larguraInput=document.getElementById('materialLargura');
+
+  if(unidade==='m'){
+    if(labelLargura)labelLargura.textContent='Largura da fita / rolo (mm)';
+    if(labelQtd)labelQtd.textContent='Comprimento do rolo (m)';
+    if(alturaField)alturaField.style.display='none';
+    if(ajuda)ajuda.classList.add('show');
+    if(larguraInput)larguraInput.placeholder='Ex.: 19';
+  }else{
+    if(labelLargura)labelLargura.textContent='Largura do material (m)';
+    if(labelQtd)labelQtd.textContent='Quantidade de metros';
+    if(alturaField)alturaField.style.display='';
+    if(ajuda)ajuda.classList.remove('show');
+    if(larguraInput)larguraInput.placeholder='Ex.: 1,22';
+  }
+
+  // Para metro linear, o usuário informa largura em mm.
+  // Internamente convertemos para metros para os cálculos.
+  const larguraM=unidade==='m' ? larguraDigitada/1000 : larguraDigitada;
+
+  const areaPeca=Math.max(0,larguraM*altura);
+  let areaTotal=areaPeca;
+  if(larguraM>0 && qtdMetros>0)areaTotal=larguraM*qtdMetros;
+
+  let custoCalculado=0;
+  let custoM2=0;
+
+  if(unidade==='m2'){
+    const divisor=areaTotal>0?areaTotal:areaPeca;
+    custoCalculado=divisor>0 ? valorPeca/divisor : 0;
+    custoM2=custoCalculado;
+  }else if(unidade==='m'){
+    // Valor do rolo ÷ comprimento do rolo = custo por metro linear.
+    custoCalculado=qtdMetros>0 ? valorPeca/qtdMetros : 0;
+    custoM2=(larguraM>0 && custoCalculado>0) ? custoCalculado/larguraM : 0;
+  }else if(unidade==='un'){
+    custoCalculado=valorPeca;
+    custoM2=areaPeca>0 ? valorPeca/areaPeca : 0;
+  }else{
+    custoCalculado=valorPeca;
+  }
+
+  const custoInput=document.getElementById('materialCusto');
+  if(custoInput)custoInput.value=custoCalculado.toFixed(4);
+
+  const areaPecaEl=document.getElementById('materialAreaPeca');
+  const areaTotalEl=document.getElementById('materialAreaTotal');
+  const custoM2El=document.getElementById('materialCustoM2');
+
+  if(areaPecaEl){
+    areaPecaEl.textContent=unidade==='m'
+      ? `${larguraDigitada.toLocaleString('pt-BR',{maximumFractionDigits:2})} mm de largura`
+      : areaPeca.toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' m²';
+  }
+
+  if(areaTotalEl){
+    areaTotalEl.textContent=unidade==='m'
+      ? `${qtdMetros.toLocaleString('pt-BR',{maximumFractionDigits:2})} m de rolo`
+      : areaTotal.toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+' m²';
+  }
+
+  if(custoM2El){
+    custoM2El.textContent=unidade==='m'
+      ? `${moedaMaterial(custoCalculado)} / m`
+      : moedaMaterial(custoM2);
+  }
+}
+
+function salvarMaterial(){
+  const nome=(document.getElementById('materialNome').value||'').trim();
+  atualizarCalculoMaterialModal();
+
+  const unidade=document.getElementById('materialUnidade').value;
+  const valorPeca=Number(document.getElementById('materialValorPeca').value)||0;
+  const larguraDigitada=Number(document.getElementById('materialLargura').value)||0;
+  const largura=unidade==='m' ? larguraDigitada/1000 : larguraDigitada;
+  const altura=Number(document.getElementById('materialAltura').value)||0;
+  const qtdMetros=Number(document.getElementById('materialQtdMetros').value)||0;
+  const custo=Number(document.getElementById('materialCusto').value)||0;
+
+  if(!nome){alert('Informe o nome do material.');return}
+  if(valorPeca<0 || custo<0){alert('Informe valores válidos.');return}
+  if(unidade==='m2' && valorPeca>0 && (largura<=0 || altura<=0)){
+    alert('Para calcular o custo por m², informe largura e altura do material.');
+    return;
+  }
+
+  const lista=lerMateriais();
+  const id=Number(document.getElementById('materialId').value)||Date.now();
+  const obj={
+    id,nome,unidade,custo,
+    valorPeca,largura,altura,qtdMetros,
+    obs:(document.getElementById('materialObs').value||'').trim(),
+    atualizadoEm:new Date().toISOString()
+  };
+  const i=lista.findIndex(x=>Number(x.id)===id);
+  if(i>=0)lista[i]=obj;else lista.push(obj);
+  gravarMateriais(lista);
+  fecharMaterialModal();
+  renderMateriais();
+  preencherSelectMateriais();
+  if(typeof preencherMateriaisLaser==='function')preencherMateriaisLaser();
+  if(typeof preencherFitasLaser==='function')preencherFitasLaser();
+}
+function excluirMaterial(id){
+  if(!confirm('Excluir este material?'))return;
+  gravarMateriais(lerMateriais().filter(x=>Number(x.id)!==Number(id)));
+  renderMateriais();
+  preencherSelectMateriais();
+}
+function renderMateriais(){
+  const box=document.getElementById('materiaisList');
+  if(!box)return;
+  const q=(document.getElementById('materiaisSearch')?.value||'').trim().toLowerCase();
+  const lista=lerMateriais()
+    .filter(m=>!q || String(m.nome||'').toLowerCase().includes(q))
+    .sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+
+  if(!lista.length){
+    box.innerHTML='<div class="material-empty">Nenhum material cadastrado.</div>';
+    return;
+  }
+  const pagina=paginarLista(lista,'materiais');
+  box.innerHTML=`
+    <div class="material-row header">
+      <div>Material</div><div>Unidade</div><div>Custo</div><div>Peça / medida</div><div>Ações</div>
+    </div>`+
+    pagina.itens.map(m=>`<div class="material-row">
+      <div><strong>${escapar(m.nome||'Material')}</strong></div>
+      <div><span class="material-unit-badge">${unidadeMaterialLabel(m.unidade)}</span></div>
+      <div><strong>${moedaMaterial(m.custo)}</strong> / ${unidadeMaterialLabel(m.unidade)}</div>
+      <div>
+        ${m.valorPeca?`<strong>${moedaMaterial(m.valorPeca)}</strong><br>`:''}
+        <small>
+          ${m.unidade==='m'&&m.largura?`${(Number(m.largura)*1000).toLocaleString('pt-BR',{maximumFractionDigits:2})} mm de largura`:m.largura&&m.altura?`${Number(m.largura).toLocaleString('pt-BR')} × ${Number(m.altura).toLocaleString('pt-BR')} m`:''}
+          ${m.qtdMetros?`${m.largura?' • ':''}${Number(m.qtdMetros).toLocaleString('pt-BR')} m`:''}
+        </small>
+      </div>
+      <div class="material-row-actions">
+        <button class="btn btn-outline" onclick="abrirMaterialModal(${m.id})">Editar</button>
+        <button class="btn btn-danger" onclick="excluirMaterial(${m.id})">Excluir</button>
+      </div>
+    </div>`).join('')+htmlPaginacaoLista('materiais',pagina,'renderMateriais');
+}
+
+function preencherSelectMateriais(){
+  const lista=lerMateriais();
+  const opts='<option value="">Selecione...</option>'+
+    lista.map(m=>`<option value="${m.id}">${escapar(m.nome)} — ${moedaMaterial(m.custo)}/${unidadeMaterialLabel(m.unidade)}</option>`).join('');
+  const main=document.getElementById('materialAnalyzerMaterial');
+  if(main)main.innerHTML=opts;
+  document.querySelectorAll('.analyzer-material-select').forEach(sel=>{
+    const val=sel.value;
+    sel.innerHTML=opts;
+    sel.value=val;
+  });
+}
+
+function abrirAnalisadorMateriais(){
+  if(!lerMateriais().length){
+    if(confirm('Você ainda não cadastrou materiais. Deseja abrir o cadastro de Materiais?')){
+      fecharModal();
+      mostrarMateriais();
+    }
+    return;
+  }
+  materialAnalyzerRows=[];
+  materialAnalyzerMode='manual';
+  const file=document.getElementById('materialAnalyzerFile');
+  if(file)file.value='';
+  document.getElementById('materialAnalyzerFileName').textContent='Nenhum arquivo selecionado';
+  document.getElementById('materialAnalyzerWidth').value='';
+  document.getElementById('materialAnalyzerHeight').value='';
+  document.getElementById('materialAnalyzerResults').innerHTML='';
+  document.getElementById('materialAnalyzerTotal').textContent=moedaMaterial(0);
+  document.getElementById('materialAnalyzerInfo').textContent='Selecione um arquivo para iniciar a análise.';
+  preencherSelectMateriais();
+  document.getElementById('materialAnalyzerBackdrop')?.classList.add('show');
+}
+function fecharAnalisadorMateriais(){
+  document.getElementById('materialAnalyzerBackdrop')?.classList.remove('show');
+}
+
+function unidadeSvgParaMetros(valor,unidade){
+  const v=Number(valor)||0;
+  const u=String(unidade||'').toLowerCase();
+  if(u==='mm')return v/1000;
+  if(u==='cm')return v/100;
+  if(u==='in')return v*0.0254;
+  if(u==='pt')return v*0.0254/72;
+  if(u==='pc')return v*0.0254/6;
+  if(u==='m')return v;
+  return null;
+}
+function parseSvgLength(txt){
+  const m=String(txt||'').trim().match(/^([+-]?(?:\d+\.?\d*|\.\d+))\s*(mm|cm|in|pt|pc|m|px)?$/i);
+  if(!m)return null;
+  return {value:Number(m[1]),unit:(m[2]||'px').toLowerCase()};
+}
+function corSvg(el){
+  const style=(el.getAttribute('style')||'').split(';').reduce((a,x)=>{
+    const p=x.split(':'); if(p.length===2)a[p[0].trim()]=p[1].trim(); return a;
+  },{});
+  let fill=el.getAttribute('fill')||style.fill||'';
+  fill=String(fill).trim().toLowerCase();
+  if(!fill || fill==='none' || fill==='transparent')return null;
+  return fill;
+}
+function areaPoligono(points){
+  const pts=String(points||'').trim().split(/\s+/).map(p=>p.split(',').map(Number)).filter(p=>p.length===2&&p.every(Number.isFinite));
+  if(pts.length<3)return 0;
