@@ -1,0 +1,500 @@
+      <div class="finance-summary-list">
+        <div><span>Pagamentos pendentes</span><strong id="dashQtdPendentes">0</strong></div>
+        <div><span>Despesas pendentes</span><strong id="dashQtdDespesas">0</strong></div>
+        <div><span>Pedidos em aberto</span><strong id="dashPedidosAbertos">0</strong></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="vendaRapidaPanel" class="finance-panel">
+  <div class="finance-card">
+    <div class="finance-list-head">
+      <div>
+        <h2>Venda Rápida</h2>
+        <p>Registre vendas já realizadas sem precisar criar orçamento ou pedido.</p>
+      </div>
+      <div class="finance-list-tools">
+        <input id="vendasRapidasSearch" placeholder="Pesquisar cliente ou serviço..." oninput="renderVendasRapidas()">
+        <button class="btn btn-primary" onclick="abrirNovaVendaRapida()">＋ Nova venda</button>
+      </div>
+    </div>
+
+    <div class="quick-sale-summary">
+      <div><span>Vendas registradas</span><strong id="vendaRapidaQtd">0</strong></div>
+      <div><span>Recebido</span><strong id="vendaRapidaRecebido">R$ 0,00</strong></div>
+      <div><span>Lucro estimado</span><strong id="vendaRapidaLucro">R$ 0,00</strong></div>
+    </div>
+
+    <div id="vendasRapidasList" class="finance-list"></div>
+  </div>
+</section>
+
+<section id="pagamentosPanel" class="finance-panel">
+  <div class="finance-card">
+    <div class="finance-list-head">
+      <div>
+        <h2>Pagamentos</h2>
+        <p>Controle os recebimentos dos pedidos aprovados.</p>
+      </div>
+      <div class="finance-list-tools">
+        <input id="pagamentosSearch" placeholder="Pesquisar cliente ou pedido..." oninput="renderPagamentos()">
+      </div>
+    </div>
+    <div id="pagamentosList" class="finance-list"></div>
+  </div>
+</section>
+
+<section id="despesasPanel" class="finance-panel">
+  <div class="finance-card">
+    <div class="finance-list-head">
+      <div>
+        <h2>Despesas</h2>
+        <p>Cadastre boletos, contas e outras despesas.</p>
+      </div>
+      <div class="finance-list-tools">
+        <input id="despesasSearch" placeholder="Pesquisar despesa..." oninput="renderDespesas()">
+        <button class="btn btn-primary" onclick="abrirNovaDespesa()">＋ Nova despesa</button>
+      </div>
+    </div>
+    <div id="despesasList" class="finance-list"></div>
+  </div>
+</section>
+
+<div id="pagamentoModalBackdrop" class="finance-modal-backdrop">
+  <div class="finance-modal">
+    <div class="finance-modal-head">
+      <div><h3>Registrar pagamento</h3><p id="pagamentoModalSub"></p></div>
+      <button onclick="fecharPagamentoModal()">×</button>
+    </div>
+    <div class="finance-modal-body">
+      <input type="hidden" id="pagamentoPedidoId">
+      <div class="finance-form-grid">
+        <div class="field"><label>Valor total do pedido</label><input id="pagamentoTotalPedido" readonly></div>
+        <div class="field"><label>Valor já pago</label><input id="pagamentoJaPago" readonly></div>
+        <div class="field"><label>Novo pagamento</label><input id="pagamentoNovoValor" type="number" min="0" step="0.01" oninput="atualizarResumoPagamentoDesconto()"></div>
+
+        <div class="field">
+          <div class="payment-discount-label-row">
+            <label>Desconto</label>
+            <button type="button" id="pagamentoDescontoToggle" class="payment-discount-toggle" onclick="alternarDescontoPagamento()">
+              <span class="payment-discount-icon">×</span>
+              <span id="pagamentoDescontoTexto">Desativado</span>
+            </button>
+          </div>
+          <div id="pagamentoDescontoCampo" class="payment-discount-field">
+            <div class="payment-discount-money">
+              <span>R$</span>
+              <input id="pagamentoDescontoValor" type="number" min="0" step="0.01" value="0" oninput="atualizarResumoPagamentoDesconto()">
+            </div>
+          </div>
+          <input id="pagamentoUsarDesconto" type="checkbox" hidden>
+        </div>
+
+        <div class="field"><label>Data do pagamento</label><input id="pagamentoData" type="date"></div>
+        <div class="field"><label>Forma de pagamento</label>
+          <select id="pagamentoForma">
+            <option>PIX</option><option>Dinheiro</option><option>Cartão</option><option>Transferência</option><option>Boleto</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="field"><label>Observação</label><input id="pagamentoObs" placeholder="Opcional"></div>
+      </div>
+      <div class="payment-discount-summary">
+        <div><span>Saldo antes</span><strong id="pagamentoSaldoAntes">R$ 0,00</strong></div>
+        <div><span>Pagamento</span><strong id="pagamentoResumoPago">R$ 0,00</strong></div>
+        <div><span>Desconto</span><strong id="pagamentoResumoDesconto">R$ 0,00</strong></div>
+        <div class="payment-discount-balance"><span>Saldo depois</span><strong id="pagamentoSaldoDepois">R$ 0,00</strong></div>
+      </div>
+    </div>
+    <div class="finance-modal-footer">
+      <button class="btn btn-light" onclick="fecharPagamentoModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarPagamentoPedido()">Salvar pagamento</button>
+    </div>
+  </div>
+</div>
+
+
+<div id="vendaRapidaModalBackdrop" class="finance-modal-backdrop">
+  <div class="finance-modal quick-sale-modal">
+    <div class="finance-modal-head">
+      <div>
+        <h3 id="vendaRapidaModalTitulo">Nova venda rápida</h3>
+        <p>O valor será lançado imediatamente como receita recebida.</p>
+      </div>
+      <button onclick="fecharVendaRapidaModal()">×</button>
+    </div>
+
+    <div class="finance-modal-body">
+      <input type="hidden" id="vendaRapidaId">
+
+      <div class="finance-form-grid">
+        <div class="field">
+          <label>Cliente</label>
+          <input id="vendaRapidaCliente" placeholder="Opcional">
+        </div>
+
+        <div class="field">
+          <label>Data da venda</label>
+          <input id="vendaRapidaData" type="date">
+        </div>
+
+        <div class="field full">
+          <label>Produto / serviço</label>
+          <input id="vendaRapidaDescricao" placeholder="Ex.: Placa em PVC, adesivo, gravação em copo..." required>
+        </div>
+
+        <div class="field">
+          <label>Valor recebido</label>
+          <div class="quick-sale-money">
+            <span>R$</span>
+            <input id="vendaRapidaValor" type="number" min="0" step="0.01" oninput="atualizarResumoVendaRapida()">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Custo do serviço <small>(opcional)</small></label>
+          <div class="quick-sale-money">
+            <span>R$</span>
+            <input id="vendaRapidaCusto" type="number" min="0" step="0.01" value="0" oninput="atualizarResumoVendaRapida()">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Forma de pagamento</label>
+          <select id="vendaRapidaForma">
+            <option>PIX</option>
+            <option>Dinheiro</option>
+            <option>Cartão</option>
+            <option>Transferência</option>
+            <option>Boleto</option>
+            <option>Outro</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Lucro estimado</label>
+          <input id="vendaRapidaLucroPreview" readonly value="R$ 0,00">
+        </div>
+
+        <div class="field full">
+          <label>Observação</label>
+          <input id="vendaRapidaObs" placeholder="Opcional">
+        </div>
+      </div>
+
+      <div class="quick-sale-info">
+        <strong>Venda recebida</strong>
+        <span>Ao salvar, ela entra automaticamente no faturamento da Dashboard e no histórico financeiro.</span>
+      </div>
+    </div>
+
+    <div class="finance-modal-footer">
+      <button class="btn btn-light" onclick="fecharVendaRapidaModal()">Cancelar</button>
+      <button class="btn btn-outline" onclick="salvarVendaRapida(true)">Salvar e adicionar outra</button>
+      <button class="btn btn-primary" onclick="salvarVendaRapida(false)">Salvar venda</button>
+    </div>
+  </div>
+</div>
+
+<div id="despesaModalBackdrop" class="finance-modal-backdrop">
+  <div class="finance-modal">
+    <div class="finance-modal-head">
+      <div><h3>Nova despesa</h3><p>Cadastre uma conta, boleto ou gasto da empresa.</p></div>
+      <button onclick="fecharDespesaModal()">×</button>
+    </div>
+    <div class="finance-modal-body">
+      <input type="hidden" id="despesaId">
+      <div class="finance-form-grid">
+        <div class="field full"><label>Descrição</label><input id="despesaDescricao" placeholder="Ex.: Energia, fornecedor, aluguel..." required></div>
+        <div class="field"><label>Fornecedor</label><input id="despesaFornecedor" placeholder="Opcional"></div>
+        <div class="field"><label>Categoria</label>
+          <select id="despesaCategoria">
+            <option>Fornecedor</option><option>Aluguel</option><option>Energia</option><option>Internet</option><option>Impostos</option><option>Transporte</option><option>Material</option><option>Outros</option>
+          </select>
+        </div>
+        <div class="field"><label>Valor</label><input id="despesaValor" type="number" min="0" step="0.01"></div>
+        <div class="field"><label>Vencimento</label><input id="despesaVencimento" type="date"></div>
+        <div class="field"><label>Status</label>
+          <select id="despesaStatus"><option>Pendente</option><option>Paga</option></select>
+        </div>
+        <div class="field"><label>Data do pagamento</label><input id="despesaDataPagamento" type="date"></div>
+
+        <div class="field full">
+          <div class="expense-recurring-box">
+            <div>
+              <strong>Despesa recorrente mensal</strong>
+              <small>Ative para internet, aluguel, contador e outras contas que se repetem todo mês.</small>
+            </div>
+            <button type="button" id="despesaRecorrenteBtn" class="expense-recurring-toggle" onclick="alternarDespesaRecorrente()">
+              <span class="expense-recurring-dot">×</span>
+              <span id="despesaRecorrenteTexto">Desativada</span>
+            </button>
+            <input id="despesaRecorrente" type="checkbox" hidden>
+          </div>
+        </div>
+
+        <div id="despesaRecorrenteDetalhes" class="field full expense-recurring-details">
+          <div class="finance-form-grid">
+            <div class="field">
+              <label>Dia do vencimento mensal</label>
+              <input id="despesaDiaVencimento" type="number" min="1" max="31" step="1" placeholder="Ex.: 10">
+            </div>
+            <div class="field">
+              <label>Gerar automaticamente</label>
+              <input value="Todo mês" readonly>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="finance-modal-footer">
+      <button class="btn btn-light" onclick="fecharDespesaModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarDespesa()">Salvar despesa</button>
+    </div>
+  </div>
+</div>
+
+
+<section id="minhaEmpresaPanel" class="company-panel">
+  <div class="company-card">
+    <div class="company-head">
+      <div>
+        <h2>Minha Empresa</h2>
+        <p>Altere os dados usados nos orçamentos e pedidos.</p>
+      </div>
+      <button type="button" class="btn btn-light" onclick="restaurarDadosEmpresa()">Restaurar padrão</button>
+    </div>
+
+    <div class="company-body">
+      <div class="company-logo-column">
+        <div class="company-logo-preview">
+          <img id="companyLogoPreview" alt="Logomarca">
+        </div>
+        <input id="companyLogoInput" type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="carregarLogoEmpresa(event)">
+        <button type="button" class="btn btn-outline company-logo-btn" onclick="document.getElementById('companyLogoInput').click()">Trocar logomarca</button>
+        <small>PNG, JPG ou WEBP. A imagem fica salva neste navegador.</small>
+      </div>
+
+      <div class="company-form">
+        <div class="company-form-grid">
+          <div class="field"><label for="empresaNome">Nome da empresa</label><input id="empresaNome"></div>
+          <div class="field"><label for="empresaCnpj">CNPJ</label><input id="empresaCnpj"></div>
+          <div class="field"><label for="empresaTelefone">Telefone / WhatsApp</label><input id="empresaTelefone"></div>
+          <div class="field"><label for="empresaInstagram">Instagram</label><input id="empresaInstagram"></div>
+          <div class="field"><label for="empresaEmail">E-mail</label><input id="empresaEmail" type="email"></div>
+          <div class="field"><label for="empresaCep">CEP</label><input id="empresaCep"></div>
+          <div class="field full"><label for="empresaEndereco">Endereço</label><input id="empresaEndereco"></div>
+          <div class="field"><label for="empresaCidade">Cidade</label><input id="empresaCidade"></div>
+          <div class="field"><label for="empresaUf">UF</label><input id="empresaUf" maxlength="2"></div>
+        </div>
+        <div class="company-actions">
+          <button type="button" class="btn btn-primary" onclick="salvarDadosEmpresa()">Salvar alterações</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section id="laserPanel" class="laser-panel">
+  <div class="laser-card">
+    <div class="laser-head">
+      <div>
+        <h2>Precificação Laser</h2>
+        <p>Calcule serviços de corte, gravação e produção em série.</p>
+      </div>
+      <button type="button" class="btn btn-outline" onclick="abrirConfiguracaoLaser()">Configurações da máquina</button>
+    </div>
+
+    <div class="laser-body">
+      <div class="laser-section">
+        <h3>Serviço</h3>
+        <div class="laser-grid">
+          <div class="field">
+            <label>Tipo de serviço</label>
+            <select id="laserTipoServico" onchange="atualizarTipoServicoLaser();calcularLaser()">
+              <option value="pequeno">Serviço pequeno</option>
+              <option value="maior">Produção / serviço maior</option>
+              <option value="personalizado">Serviço personalizado</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Operação</label>
+            <select id="laserOperacao" onchange="calcularLaser()">
+              <option>Corte</option>
+              <option>Gravação</option>
+              <option>Corte + Gravação</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Produto / serviço</label>
+            <input id="laserDescricao" placeholder="Ex.: Chaveiro acrílico, gravação em copo">
+          </div>
+          <div class="field">
+            <label>Quantidade</label>
+            <input id="laserQuantidade" type="number" min="1" step="1" value="1" oninput="calcularLaser()">
+          </div>
+        </div>
+      </div>
+
+      <div class="laser-section">
+        <h3>Tempo e custos</h3>
+        <div class="laser-grid">
+          <div class="field">
+            <label>Tempo de laser por peça (min)</label>
+            <input id="laserTempoPeca" type="number" min="0" step="0.1" value="1" oninput="calcularLaser()">
+          </div>
+          <div class="field">
+            <div class="laser-field-label-row">
+              <label>Preparação (min)</label>
+              <button type="button" id="laserPreparacaoToggleBtn" class="laser-state-button compact active" onclick="alternarPreparacaoLaser()">
+                <span class="laser-state-icon">✓</span>
+                <span id="laserPreparacaoToggleTexto">Preparação ativada</span>
+              </button>
+            </div>
+            <input id="laserPreparacaoMin" type="number" min="0" step="0.1" value="5" oninput="calcularLaser()">
+          </div>
+          <div class="field">
+            <label>Material utilizado</label>
+            <select id="laserMaterialSelecionado" onchange="atualizarMaterialLaserSelecionado()">
+              <option value="">Sem material / selecionar...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Custo de material por peça</label>
+            <div class="laser-money"><span>R$</span><input id="laserMaterialPeca" type="number" min="0" step="0.01" value="0" oninput="calcularLaser()"></div>
+          </div>
+          <div class="field">
+            <label>Acessórios / acabamento por peça</label>
+            <div class="laser-money"><span>R$</span><input id="laserAdicionalPeca" type="number" min="0" step="0.01" value="0" oninput="calcularLaser()"></div>
+          </div>
+          <div class="field">
+            <label>Mão de obra adicional</label>
+            <div class="laser-money"><span>R$</span><input id="laserMaoObra" type="number" min="0" step="0.01" value="0" oninput="calcularLaser()"></div>
+          </div>
+          <div class="field">
+            <label>Margem de lucro</label>
+            <div class="laser-percent"><input id="laserMargem" type="number" min="0" step="1" value="50" oninput="calcularLaser()"><span>%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="laserTaxaMinimaBox" class="laser-section laser-minimum-box">
+        <div class="laser-minimum-head">
+          <div>
+            <h3>Taxa mínima</h3>
+            <p>Aplicada automaticamente quando o valor calculado ficar abaixo do mínimo.</p>
+          </div>
+          <button type="button" id="laserTaxaMinimaToggleBtn" class="laser-state-button active" onclick="alternarTaxaMinimaLaser()">
+            <span class="laser-state-icon">✓</span>
+            <span id="laserTaxaMinimaToggleTexto">Taxa mínima ativada</span>
+          </button>
+          <input id="laserUsarTaxaMinima" type="checkbox" checked hidden>
+        </div>
+        <div class="laser-grid">
+          <div class="field">
+            <label>Taxa mínima do serviço</label>
+            <div class="laser-money"><span>R$</span><input id="laserTaxaMinima" type="number" min="0" step="0.01" value="15" oninput="calcularLaser()"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="laser-section">
+        <div class="laser-svg-head">
+          <div>
+            <h3>Analisar arquivo SVG</h3>
+            <p>Preto = gravação • Vermelho = corte. Também reconhece tons de vermelho comuns de CorelDRAW/Illustrator.</p>
+          </div>
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('laserSvgFile').click()">Anexar SVG</button>
+          <input id="laserSvgFile" type="file" accept=".svg,image/svg+xml" hidden onchange="analisarSvgLaser(event)">
+        </div>
+        <div id="laserSvgInfo" class="laser-svg-info">Nenhum SVG analisado.</div>
+        <div class="laser-svg-results">
+          <div><span>Gravação (preto)</span><strong id="laserSvgTempoGravacao">0s</strong><small id="laserSvgAreaGravacao">0,00 cm²</small></div>
+          <div><span>Corte (vermelho)</span><strong id="laserSvgTempoCorte">0s</strong><small id="laserSvgComprimentoCorte">0 mm</small></div>
+          <div class="laser-svg-total"><span>Tempo total estimado</span><strong id="laserSvgTempoTotal">0s</strong><small id="laserSvgCustoEstimado">R$ 0,00 de máquina</small></div>
+        </div>
+        <div class="laser-material-usage">
+          <div>
+            <span>Tamanho ocupado na chapa</span>
+            <strong id="laserSvgTamanhoMaterial">0,00 × 0,00 cm</strong>
+          </div>
+          <div>
+            <span>Área de material usada</span>
+            <strong id="laserSvgAreaMaterial">0,0000 m²</strong>
+          </div>
+          <div>
+            <span>Custo do material por peça</span>
+            <strong id="laserSvgCustoMaterial">R$ 0,00</strong>
+          </div>
+          <div>
+            <span>Aproveitamento da chapa</span>
+            <strong id="laserSvgAproveitamentoChapa">—</strong>
+          </div>
+        </div>
+        <div id="laserMaterialInfo" class="laser-material-info">
+          Selecione um material cadastrado para calcular automaticamente o custo da área usada.
+        </div>
+        <div class="laser-tape-box">
+          <div class="laser-tape-head">
+            <div>
+              <strong>Fita dupla face</strong>
+              <small>Use os retângulos azuis de uma letra como padrão. O sistema estima quantos pedaços iguais serão necessários nas demais peças vermelhas.</small>
+            </div>
+            <button type="button" id="laserFitaToggleBtn" class="laser-state-button compact" onclick="alternarFitaLaser()">
+              <span class="laser-state-icon">×</span>
+              <span id="laserFitaToggleTexto">Desativada</span>
+            </button>
+            <input id="laserFitaAtiva" type="checkbox" hidden>
+          </div>
+
+          <div id="laserFitaDetalhes" class="laser-tape-details">
+            <div class="laser-grid">
+              <div class="field">
+                <label>Fita cadastrada</label>
+                <select id="laserFitaMaterial" onchange="calcularFitaLaser()">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Modelo no SVG</label>
+                <input id="laserFitaModeloStatus" value="Aguardando retângulos azuis..." readonly>
+              </div>
+
+              <div class="field">
+                <label>Medida do pedaço detectado</label>
+                <input id="laserFitaPecaDetectada" value="—" readonly>
+              </div>
+            </div>
+
+            <div class="laser-tape-results">
+              <div><span>Marcadores no modelo</span><strong id="laserFitaMarcadores">0</strong></div>
+              <div><span>Pedaços estimados</span><strong id="laserFitaPecas">0</strong></div>
+              <div><span>Fita necessária</span><strong id="laserFitaMetros">0,00 m</strong></div>
+              <div><span>Custo estimado</span><strong id="laserFitaCusto">R$ 0,00</strong></div>
+            </div>
+
+            <div id="laserFitaInfo" class="laser-material-info">
+              Cadastre a fita em Materiais. No SVG, use retângulos azuis como exemplo real de posicionamento da fita em uma das letras.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="laser-section">
+        <h3>Resultado</h3>
+        <div class="laser-results">
+          <div><span>Tempo total de laser</span><strong id="laserTempoTotal">0 min</strong></div>
+          <div><span>Custo máquina</span><strong id="laserCustoMaquina">R$ 0,00</strong></div>
+          <div><span>Materiais + adicionais</span><strong id="laserCustosExtras">R$ 0,00</strong></div>
+          <div><span>Custo total</span><strong id="laserCustoTotal">R$ 0,00</strong></div>
+          <div><span>Preço calculado</span><strong id="laserPrecoCalculado">R$ 0,00</strong></div>
+          <div class="laser-result-highlight"><span>Preço sugerido total</span><strong id="laserPrecoSugerido">R$ 0,00</strong></div>
+          <div><span>Preço sugerido por unidade</span><strong id="laserPrecoUnidade">R$ 0,00</strong></div>
+        </div>
+        <div id="laserTaxaAplicadaAviso" class="laser-minimum-warning">
+          A taxa mínima foi aplicada porque o preço calculado ficou abaixo do mínimo configurado.
+        </div>
