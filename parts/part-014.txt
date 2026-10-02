@@ -1,0 +1,500 @@
+  localStorage.setItem(PRODUCTS_LOCAL_KEY,JSON.stringify(lista));
+}
+function tipoMedidaAtual(){
+  return document.querySelector('input[name="tipoMedidaProduto"]:checked')?.value || 'm2';
+}
+function moedaNum(v){
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
+}
+function numero2(v){
+  return (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function atualizarTipoMedidaProduto(){
+  const tipo=tipoMedidaAtual();
+  const isM=tipo==='m2';
+  document.getElementById('medLarguraLabel').textContent=isM?'Largura (m)':'Largura (cm)';
+  document.getElementById('medAlturaLabel').textContent=isM?'Altura (m)':'Altura (cm)';
+  document.getElementById('medTotalLabel').textContent=isM?'Total (m²)':'Total (cm²)';
+  document.getElementById('medCustoLabel').textContent=isM?'Custo do m²':'Custo do cm²';
+  document.getElementById('medPrecoLabel').textContent=isM?'Preço do m²':'Preço do cm²';
+  calcularProdutoMedida();
+}
+function calcularProdutoMedida(){
+  const largura=Number(document.getElementById('medLargura').value)||0;
+  const altura=Number(document.getElementById('medAltura').value)||0;
+  const custo=Number(document.getElementById('medCustoUnit').value)||0;
+  const preco=Number(document.getElementById('medPrecoUnit').value)||0;
+  const area=largura*altura;
+  document.getElementById('medAreaTotal').value=numero2(area);
+  document.getElementById('medCustoTotal').value=moedaNum(area*custo);
+  document.getElementById('medVendaTotal').value=moedaNum(area*preco);
+}
+function limparModalProdutoMedida(){
+  produtoMedidaEditandoId=null;
+  document.querySelector('input[name="tipoMedidaProduto"][value="m2"]').checked=true;
+  document.getElementById('medProdutoNome').value='';
+  document.getElementById('medLargura').value='';
+  document.getElementById('medAltura').value='';
+  document.getElementById('medCustoUnit').value='';
+  document.getElementById('medPrecoUnit').value='';
+  atualizarTipoMedidaProduto();
+}
+function abrirModalProdutoMedida(){
+  limparModalProdutoMedida();
+  document.getElementById('measureModalBackdrop').classList.add('show');
+  setTimeout(()=>document.getElementById('medProdutoNome').focus(),50);
+}
+function fecharModalProdutoMedida(){
+  document.getElementById('measureModalBackdrop').classList.remove('show');
+}
+function fecharModalProdutoMedidaFora(e){
+  if(e.target.id==='measureModalBackdrop') fecharModalProdutoMedida();
+}
+function salvarProdutoMedida(){
+  const nome=document.getElementById('medProdutoNome').value.trim();
+  const largura=Number(document.getElementById('medLargura').value)||0;
+  const altura=Number(document.getElementById('medAltura').value)||0;
+  const custoUnit=Number(document.getElementById('medCustoUnit').value)||0;
+  const precoUnit=Number(document.getElementById('medPrecoUnit').value)||0;
+  const tipo=tipoMedidaAtual();
+  const area=largura*altura;
+
+  if(!nome){alert('Digite o nome do produto.');return}
+  if(largura<=0 || altura<=0){alert('Informe largura e altura válidas.');return}
+
+  const lista=lerProdutosMedida();
+  const agora=new Date().toISOString();
+
+  const item={
+    id:produtoMedidaEditandoId||Date.now(),
+    nome,tipo,largura,altura,area,
+    custoUnit,precoUnit,
+    custoTotal:area*custoUnit,
+    vendaTotal:area*precoUnit,
+    atualizadoEm:agora
+  };
+
+  const i=lista.findIndex(p=>Number(p.id)===Number(item.id));
+  if(i>=0) lista[i]=item; else lista.push(item);
+  gravarProdutosMedida(lista);
+
+  fecharModalProdutoMedida();
+  renderizarProdutosAdmin();
+  alert('Produto salvo com sucesso!');
+}
+function editarProdutoMedida(id){
+  const p=lerProdutosMedida().find(x=>Number(x.id)===Number(id));
+  if(!p) return;
+  produtoMedidaEditandoId=p.id;
+  document.querySelector(`input[name="tipoMedidaProduto"][value="${p.tipo||'m2'}"]`).checked=true;
+  document.getElementById('medProdutoNome').value=p.nome||'';
+  document.getElementById('medLargura').value=p.largura||'';
+  document.getElementById('medAltura').value=p.altura||'';
+  document.getElementById('medCustoUnit').value=p.custoUnit||'';
+  document.getElementById('medPrecoUnit').value=p.precoUnit||'';
+  atualizarTipoMedidaProduto();
+  document.getElementById('measureModalBackdrop').classList.add('show');
+}
+function excluirProdutoMedida(id){
+  if(!confirm('Deseja excluir este produto?')) return;
+  gravarProdutosMedida(lerProdutosMedida().filter(p=>Number(p.id)!==Number(id)));
+  renderizarProdutosAdmin();
+}
+function renderizarProdutosAdmin(){
+  const list=document.getElementById('productsAdminList');
+  if(!list) return;
+  let itens=lerProdutosMedida().sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+  const q=(document.getElementById('productsAdminSearch')?.value||'').trim().toLowerCase();
+  if(q) itens=itens.filter(p=>String(p.nome||'').toLowerCase().includes(q));
+
+  document.getElementById('productsAdminCount').textContent=`${itens.length} ${itens.length===1?'produto':'produtos'}`;
+
+  if(!itens.length){
+    list.innerHTML='<div class="empty-history">Nenhum produto cadastrado ainda.</div>';
+    return;
+  }
+
+  const pagina=paginarLista(itens,'produtos');
+
+  list.innerHTML=`
+    <div class="product-admin-row header">
+      <div>Produto</div><div>Medida</div><div>Área</div><div>Preço unit.</div><div>Total venda</div><div style="text-align:right">Ações</div>
+    </div>`+
+    pagina.itens.map(p=>{
+      const unidade=p.tipo==='cm2'?'cm²':'m²';
+      return `<div class="product-admin-row">
+        <div><strong>${escapar(p.nome||'')}</strong></div>
+        <div><span class="metric-badge">${p.largura} × ${p.altura} ${p.tipo==='cm2'?'cm':'m'}</span></div>
+        <div>${numero2(p.area)} ${unidade}</div>
+        <div>${moedaNum(p.precoUnit)}</div>
+        <div><strong>${moedaNum(p.vendaTotal)}</strong></div>
+        <div class="product-admin-actions">
+          <button class="btn btn-secondary" onclick="editarProdutoMedida(${p.id})">Editar</button>
+          <button class="btn btn-danger" onclick="excluirProdutoMedida(${p.id})">Excluir</button>
+        </div>
+      </div>`;
+    }).join('')+htmlPaginacaoLista('produtos',pagina,'renderizarProdutosAdmin');
+}
+
+function mostrarProdutosAdmin(){
+  document.getElementById('mainTopbar').style.display='none';
+  document.getElementById('mainQuote').style.display='none';
+  document.getElementById('savedPanel').classList.remove('show');
+  document.getElementById('clientsPanel').classList.remove('show');
+  document.getElementById('productsAdminPanel').classList.add('show');
+  setNav('produtos');
+  renderizarProdutosAdmin();
+}
+
+const originalMostrarNovo2=mostrarNovoOrcamento;
+mostrarNovoOrcamento=function(){
+  document.getElementById('productsAdminPanel').classList.remove('show');
+  originalMostrarNovo2();
+};
+const originalMostrarSalvos2=mostrarOrcamentosSalvos;
+mostrarOrcamentosSalvos=async function(){
+  document.getElementById('productsAdminPanel').classList.remove('show');
+  await originalMostrarSalvos2();
+};
+const originalMostrarClientes2=mostrarClientes;
+mostrarClientes=function(){
+  document.getElementById('productsAdminPanel').classList.remove('show');
+  originalMostrarClientes2();
+};
+const originalSetNav2=setNav;
+setNav=function(active){
+  originalSetNav2(active);
+  document.getElementById('navProdutosAdmin').classList.toggle('active',active==='produtos');
+};
+
+
+
+function toggleProdutosSalvosNoModal(){
+  const picker=document.getElementById('savedProductPicker');
+  if(!picker) return;
+
+  picker.classList.add('show');
+
+  const busca=document.getElementById('savedProductPickerSearch');
+  if(busca) busca.value='';
+
+  renderProdutosSalvosNoModal();
+
+  setTimeout(()=>busca?.focus(),50);
+}
+
+function fecharProdutosSalvosNoModal(){
+  const picker=document.getElementById('savedProductPicker');
+  if(picker) picker.classList.remove('show');
+}
+
+function renderProdutosSalvosNoModal(){
+  const list=document.getElementById('savedProductPickerList');
+  if(!list) return;
+
+  let itens=lerProdutosMedida();
+  const q=(document.getElementById('savedProductPickerSearch')?.value||'')
+    .trim().toLowerCase();
+
+  if(q){
+    itens=itens.filter(p=>
+      String(p.nome||'').toLowerCase().includes(q)
+    );
+  }
+
+  itens.sort((a,b)=>
+    String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR')
+  );
+
+  if(!itens.length){
+    list.innerHTML='<div class="saved-product-empty">Nenhum produto salvo encontrado.<br><small>Cadastre produtos pelo item “Produtos” do menu lateral.</small></div>';
+    return;
+  }
+
+  list.innerHTML=itens.map(p=>{
+    const unidade=p.tipo==='cm2'?'cm²':'m²';
+    const medidaUnidade=p.tipo==='cm2'?'cm':'m';
+
+    return `<button type="button" class="saved-product-option"
+              onclick="usarProdutoSalvoNoOrcamento(${p.id})">
+      <div>
+        <strong>${escapar(p.nome||'')}</strong><br>
+        <small>${p.largura} × ${p.altura} ${medidaUnidade}</small>
+      </div>
+      <div>
+        <small>Área</small><br>
+        ${numero2(p.area)} ${unidade}
+      </div>
+      <div>
+        <small>Preço calculado</small><br>
+        <strong>${moedaNum(p.vendaTotal)}</strong>
+      </div>
+      <div class="saved-product-select">Selecionar ›</div>
+    </button>`;
+  }).join('');
+}
+
+function usarProdutoSalvoNoOrcamento(id){
+  const p=lerProdutosMedida().find(x=>Number(x.id)===Number(id));
+  if(!p) return;
+
+  // Usa exatamente os produtos cadastrados no item "Produtos" do menu lateral.
+  document.getElementById('produtoBusca').value=p.nome||'';
+  document.getElementById('quantidade').value=1;
+  document.getElementById('custoProducao').value=Number(p.custoTotal)||0;
+  document.getElementById('precoVenda').value=Number(p.vendaTotal)||0;
+
+  calcularModal();
+
+  // Após selecionar, a lista desaparece e volta para a janela Adicionar produto.
+  fecharProdutosSalvosNoModal();
+}
+
+
+function normalizarTelefoneWhatsApp(contato){
+  let n=String(contato||'').replace(/\D/g,'');
+  if(!n) return '';
+  // Assume Brasil when DDI is not present.
+  if(n.length===10 || n.length===11){
+    n='55'+n;
+  }
+  return n;
+}
+
+async function enviarOrcamentoWhatsApp(id){
+  const x=await dbGet(id);
+  if(!x){
+    alert('Orçamento não encontrado.');
+    return;
+  }
+
+  const telefone=normalizarTelefoneWhatsApp(x.contato);
+  if(!telefone){
+    alert('Este orçamento não possui um contato válido para WhatsApp.');
+    return;
+  }
+
+  const numero=x.numero||'';
+  const cliente=x.cliente||'';
+  const total=moeda(Number(x.total)||0);
+
+  const mensagem=
+    `Olá${cliente ? ' '+cliente : ''}! Segue o orçamento ${numero ? numero : ''} da R-PRINT.`+
+    `\nTotal: ${total}`+
+    `\n\nO PDF pode ser anexado nesta conversa após abrir o WhatsApp.`;
+
+  const url='https://wa.me/'+telefone+'?text='+encodeURIComponent(mensagem);
+  window.open(url,'_blank');
+}
+
+
+function montarDadosBackup(){
+  return {
+    versao:1,
+    geradoEm:new Date().toISOString(),
+    clientes:lerClientesLocal(),
+    produtos:lerProdutosMedida(),
+    orcamentos:lerOrcamentosLocal()
+  };
+}
+
+async function fazerBackup(){
+  const dados=montarDadosBackup();
+  const json=JSON.stringify(dados,null,2);
+  const nome='RPRINT_Backup_'+new Date().toLocaleDateString('pt-BR').replaceAll('/','-')+'.json';
+
+  // Chrome/Edge modernos: permite escolher local e nome do arquivo.
+  if(window.showSaveFilePicker){
+    try{
+      const handle=await window.showSaveFilePicker({
+        suggestedName:nome,
+        types:[{
+          description:'Backup R-PRINT',
+          accept:{'application/json':['.json']}
+        }]
+      });
+      const gravavel=await handle.createWritable();
+      await gravavel.write(json);
+      await gravavel.close();
+      alert('Backup salvo com sucesso!');
+      return;
+    }catch(e){
+      if(e && e.name==='AbortError') return;
+      console.warn('Seletor de arquivo indisponível, usando download normal.',e);
+    }
+  }
+
+  // Fallback: download normal.
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=nome;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  alert('Backup gerado. Se necessário, mova o arquivo para a sua pasta de backup.');
+}
+
+function restaurarBackup(){
+  document.getElementById('backupFileInput').value='';
+  document.getElementById('backupFileInput').click();
+}
+
+async function processarArquivoBackup(event){
+  const arquivo=event.target.files?.[0];
+  if(!arquivo) return;
+
+  try{
+    const texto=await arquivo.text();
+    const dados=JSON.parse(texto);
+
+    if(!dados || !Array.isArray(dados.clientes) || !Array.isArray(dados.produtos) || !Array.isArray(dados.orcamentos)){
+      alert('Este arquivo não parece ser um backup válido da R-PRINT.');
+      return;
+    }
+
+    const confirmar=confirm(
+      'Restaurar este backup irá substituir as listas atuais de clientes, produtos e orçamentos. Deseja continuar?'
+    );
+    if(!confirmar) return;
+
+    gravarClientesLocal(dados.clientes);
+    gravarProdutosMedida(dados.produtos);
+    gravarOrcamentosLocal(dados.orcamentos);
+
+    await carregarClientesCache();
+    await renderizarClientes();
+    renderizarProdutosAdmin();
+    await renderizarHistorico();
+
+    alert('Backup restaurado com sucesso!');
+  }catch(e){
+    console.error(e);
+    alert('Não foi possível restaurar este arquivo de backup.');
+  }
+}
+
+function mostrarBackup(){
+  document.getElementById('mainTopbar').style.display='none';
+  document.getElementById('mainQuote').style.display='none';
+  document.getElementById('savedPanel').classList.remove('show');
+  document.getElementById('clientsPanel').classList.remove('show');
+  document.getElementById('productsAdminPanel').classList.remove('show');
+  document.getElementById('backupPanel').classList.add('show');
+  setNav('backup');
+}
+
+const backupMostrarNovo=mostrarNovoOrcamento;
+mostrarNovoOrcamento=function(){
+  document.getElementById('backupPanel').classList.remove('show');
+  backupMostrarNovo();
+};
+
+const backupMostrarSalvos=mostrarOrcamentosSalvos;
+mostrarOrcamentosSalvos=async function(){
+  document.getElementById('backupPanel').classList.remove('show');
+  await backupMostrarSalvos();
+};
+
+const backupMostrarClientes=mostrarClientes;
+mostrarClientes=function(){
+  document.getElementById('backupPanel').classList.remove('show');
+  backupMostrarClientes();
+};
+
+const backupMostrarProdutos=mostrarProdutosAdmin;
+mostrarProdutosAdmin=function(){
+  document.getElementById('backupPanel').classList.remove('show');
+  backupMostrarProdutos();
+};
+
+const backupSetNav=setNav;
+setNav=function(active){
+  backupSetNav(active);
+  document.getElementById('navBackup').classList.toggle('active',active==='backup');
+};
+
+
+function formatarCelularBR(valor){
+  let n=String(valor||'').replace(/\D/g,'').slice(0,11);
+
+  if(n.length===0) return '';
+  if(n.length<=2) return '('+n;
+  if(n.length<=7) return '('+n.slice(0,2)+') '+n.slice(2);
+
+  if(n.length<=10){
+    return '('+n.slice(0,2)+') '+n.slice(2,6)+'-'+n.slice(6);
+  }
+
+  return '('+n.slice(0,2)+') '+n.slice(2,7)+'-'+n.slice(7);
+}
+
+function aplicarMascaraTelefone(input){
+  const pos=input.selectionStart;
+  input.value=formatarCelularBR(input.value);
+}
+
+function ativarMascarasTelefone(){
+  const ids=['contato','cadClienteContato'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el || el.dataset.mascaraTelefone==='1') return;
+    el.dataset.mascaraTelefone='1';
+    el.setAttribute('inputmode','numeric');
+    el.addEventListener('input',()=>aplicarMascaraTelefone(el));
+  });
+}
+
+document.addEventListener('DOMContentLoaded',ativarMascarasTelefone);
+setTimeout(ativarMascarasTelefone,100);
+
+
+async function abrirClientesSalvos(){
+  await carregarClientesCache();
+  const picker=document.getElementById('savedClientPicker');
+  picker.classList.add('show');
+  const busca=document.getElementById('savedClientPickerSearch');
+  if(busca) busca.value='';
+  renderClientesSalvosNoOrcamento();
+  setTimeout(()=>busca?.focus(),50);
+}
+
+function fecharClientesSalvos(){
+  document.getElementById('savedClientPicker')?.classList.remove('show');
+}
+
+function renderClientesSalvosNoOrcamento(){
+  const list=document.getElementById('savedClientPickerList');
+  if(!list) return;
+
+  let itens=[...clientesCache];
+  const q=(document.getElementById('savedClientPickerSearch')?.value||'').trim().toLowerCase();
+
+  if(q){
+    itens=itens.filter(c=>
+      String(c.nome||'').toLowerCase().includes(q) ||
+      String(c.contato||'').toLowerCase().includes(q)
+    );
+  }
+
+  if(!itens.length){
+    list.innerHTML='<div class="saved-client-empty">Nenhum cliente salvo encontrado.<br><small>Cadastre clientes pelo item “Clientes” do menu lateral.</small></div>';
+    return;
+  }
+
+  list.innerHTML=itens.map(c=>`
+    <button type="button" class="saved-client-option" onclick="usarClienteSalvoNoOrcamento(${c.id})">
+      <div>
+        <strong>${escapar(c.nome||'')}</strong><br>
+        <small>Cliente cadastrado</small>
+      </div>
+      <div>
+        <small>Contato</small><br>
+        ${escapar(c.contato||'-')}
+      </div>
+      <div class="saved-client-select">Selecionar ›</div>
+    </button>
+  `).join('');
