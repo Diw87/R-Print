@@ -1,0 +1,500 @@
+function removerFotoUsuarioLocal(){
+  const users=rprintGetUsers();
+  const atual=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+  const idx=users.findIndex(u=>u.user===atual);
+  if(idx<0)return;
+
+  users[idx].photo='';
+  rprintSaveUsers(users);
+
+  atualizarFotoUsuarioMenu();
+  abrirPerfilUsuarioLocal();
+  renderUsuariosLocais();
+}
+
+function abrirGerenciarUsuariosLocais(){
+  ['newLocalUserName','newLocalUserPass','newLocalUserPass2','newLocalUserHint'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.value='';
+  });
+  const msg=document.getElementById('newLocalUserMsg');
+  if(msg)msg.textContent='';
+  renderUsuariosLocais();
+  document.getElementById('localUsersBackdrop')?.classList.add('show');
+  setTimeout(()=>document.getElementById('newLocalUserName')?.focus(),50);
+}
+
+function fecharGerenciarUsuariosLocais(){
+  document.getElementById('localUsersBackdrop')?.classList.remove('show');
+}
+
+async function salvarNovoUsuarioLocal(event){
+  event.preventDefault();
+  const nome=document.getElementById('newLocalUserName').value.trim();
+  const senha=document.getElementById('newLocalUserPass').value;
+  const senha2=document.getElementById('newLocalUserPass2').value;
+  const dica=(document.getElementById('newLocalUserHint').value||'').trim();
+  const msg=document.getElementById('newLocalUserMsg');
+  msg.textContent='';
+
+  if(!nome){
+    msg.textContent='Digite o nome do usuário.';
+    return;
+  }
+  if(senha.length<4){
+    msg.textContent='A senha precisa ter pelo menos 4 caracteres.';
+    return;
+  }
+  if(senha!==senha2){
+    msg.textContent='As senhas não conferem.';
+    return;
+  }
+
+  const users=rprintGetUsers();
+  if(users.some(u=>u.user.toLowerCase()===nome.toLowerCase())){
+    msg.textContent='Esse nome de usuário já existe.';
+    return;
+  }
+
+  users.push({
+    id:Date.now(),
+    user:nome,
+    passHash:await rprintHash(senha),
+    hint:dica,
+    criadoEm:new Date().toISOString()
+  });
+
+  rprintSaveUsers(users);
+  document.getElementById('newLocalUserName').value='';
+  document.getElementById('newLocalUserPass').value='';
+  document.getElementById('newLocalUserPass2').value='';
+  document.getElementById('newLocalUserHint').value='';
+  renderUsuariosLocais();
+  alert('Novo usuário adicionado com sucesso.');
+}
+
+function renderUsuariosLocais(){
+  const box=document.getElementById('localUsersList');
+  if(!box)return;
+
+  const users=rprintGetUsers();
+  const atual=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+
+  if(!users.length){
+    box.innerHTML='<div class="empty-history">Nenhum usuário cadastrado.</div>';
+    return;
+  }
+
+  box.innerHTML=users.map(u=>`
+    <div class="local-user-row">
+      <div class="local-user-row-profile">
+        <span class="local-user-list-avatar">
+          ${u.photo?`<img src="${u.photo}" alt="">`:`<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-4 3.1-6 7-6s6.3 2 7 6"/></svg>`}
+        </span>
+        <div>
+          <strong>${escapar(u.user||'Usuário')}
+            ${u.user===atual?'<span class="local-user-current">Você</span>':''}
+          </strong>
+          <small>${u.hint?'Dica cadastrada':'Sem dica de senha'}</small>
+        </div>
+      </div>
+      <div class="local-user-row-actions">
+        ${u.user!==atual?`<button type="button" class="local-user-delete" onclick="excluirUsuarioLocal(${u.id})">Excluir</button>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function excluirUsuarioLocal(id){
+  const users=rprintGetUsers();
+  const atual=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+  const alvo=users.find(u=>Number(u.id)===Number(id));
+  if(!alvo)return;
+
+  if(alvo.user===atual){
+    alert('Você não pode excluir o usuário que está conectado.');
+    return;
+  }
+
+  if(users.length<=1){
+    alert('É necessário manter pelo menos um usuário cadastrado.');
+    return;
+  }
+
+  if(!confirm(`Deseja excluir o usuário "${alvo.user}"?`))return;
+
+  rprintSaveUsers(users.filter(u=>Number(u.id)!==Number(id)));
+  renderUsuariosLocais();
+}
+</script>
+
+<div id="produtoM2Backdrop" class="produto-m2-backdrop">
+<div class="produto-m2-modal">
+  <div class="produto-m2-head"><h2>Adicionar produto</h2><button class="produto-m2-close" onclick="fecharProdutoM2()">×</button></div>
+  <div class="produto-m2-type">
+    <label><input type="radio" name="produtoM2Tipo" value="m2" checked onchange="atualizarTipoProdutoM2()"> Produto por m²</label>
+    <label><input type="radio" name="produtoM2Tipo" value="cm2" onchange="atualizarTipoProdutoM2()"> Produto por cm²</label>
+  </div>
+  <div class="field"><label>Nome do Produto</label><input id="produtoM2Nome" placeholder="Digite o nome do produto..."></div>
+  <div class="produto-m2-grid medidas">
+    <div class="field"><label id="m2LabL">Largura (m)</label><input id="produtoM2Largura" type="number" min="0" step="0.01" oninput="calcularProdutoM2()"></div>
+    <div class="field"><label id="m2LabA">Altura (m)</label><input id="produtoM2Altura" type="number" min="0" step="0.01" oninput="calcularProdutoM2()"></div>
+    <div class="field"><label id="m2LabT">Total (m²)</label><input id="produtoM2Total" value="0,00" readonly></div>
+  </div>
+  <div class="produto-m2-grid valores produto-m2-grid-valores-simples">
+    <div class="field"><label id="m2LabV">Preço do m²</label><div class="m2-money"><span>R$</span><input id="produtoM2Venda" type="number" min="0" step="0.01" oninput="calcularProdutoM2()"></div></div>
+    <div class="field"><label>Preço de Venda Total</label><div class="m2-money"><span>R$</span><input id="produtoM2VendaTotal" value="0,00" readonly></div></div>
+  </div>
+  <div class="produto-m2-footer"><button class="btn" onclick="fecharProdutoM2()">Fechar</button><button class="btn btn-primary" onclick="adicionarProdutoM2()">Adicionar ao Carrinho</button></div>
+</div></div>
+<script>
+function abrirProdutoM2(){
+ document.getElementById('produtoM2Backdrop').classList.add('show');
+ ['produtoM2Nome','produtoM2Largura','produtoM2Altura','produtoM2Venda'].forEach(id=>document.getElementById(id).value='');
+ document.querySelector('input[name="produtoM2Tipo"][value="m2"]').checked=true; atualizarTipoProdutoM2(); calcularProdutoM2();
+}
+function fecharProdutoM2(){document.getElementById('produtoM2Backdrop').classList.remove('show')}
+function atualizarTipoProdutoM2(){
+ const cm=document.querySelector('input[name="produtoM2Tipo"]:checked').value==='cm2';
+ document.getElementById('m2LabL').textContent=cm?'Largura (cm)':'Largura (m)';
+ document.getElementById('m2LabA').textContent=cm?'Altura (cm)':'Altura (m)';
+ document.getElementById('m2LabT').textContent=cm?'Total (cm²)':'Total (m²)';
+ document.getElementById('m2LabV').textContent=cm?'Preço do cm²':'Preço do m²'; calcularProdutoM2();
+}
+function calcularProdutoM2(){
+ const l=Number(document.getElementById('produtoM2Largura').value)||0,a=Number(document.getElementById('produtoM2Altura').value)||0,t=l*a;
+ const v=Number(document.getElementById('produtoM2Venda').value)||0;
+ document.getElementById('produtoM2Total').value=numeroBR(t);
+ document.getElementById('produtoM2VendaTotal').value=numeroBR(t*v);
+}
+function adicionarProdutoM2(){
+ const nome=document.getElementById('produtoM2Nome').value.trim(),tipo=document.querySelector('input[name="produtoM2Tipo"]:checked').value;
+ const l=Number(document.getElementById('produtoM2Largura').value)||0,a=Number(document.getElementById('produtoM2Altura').value)||0,t=l*a,v=Number(document.getElementById('produtoM2Venda').value)||0;
+ if(!nome){alert('Informe o nome do produto.');return}
+ if(l<=0||a<=0){alert('Informe largura e altura válidas.');return}
+ if(v<0){alert('Informe um preço válido.');return}
+
+ const un=tipo==='cm2'?'cm':'m',ua=tipo==='cm2'?'cm²':'m²';
+ const descricao=`${nome} — ${l.toLocaleString('pt-BR')} × ${a.toLocaleString('pt-BR')} ${un} (${numeroBR(t)} ${ua})`;
+
+ produtos.push({
+   id:Date.now(),
+   descricao,
+   qtd:1,
+   custo:0,
+   venda:v,
+   custoTotal:0,
+   total:t*v,
+   calculoArea:true,
+   tipoArea:tipo,
+   largura:l,
+   altura:a,
+   area:t
+ });
+
+ renderProdutos();
+
+ // Fecha a janela Produto por Metro².
+ fecharProdutoM2();
+
+ // Fecha também a janela principal "Adicionar produto".
+ document.getElementById('modalBackdrop')?.classList.remove('show');
+
+ // Garante retorno à tela Novo Orçamento com o produto já visível.
+ if(typeof mostrarNovoOrcamento==='function'){
+   mostrarNovoOrcamento();
+ }
+}
+</script>
+
+<script>
+/* ===== MÓDULO DE PEDIDOS ===== */
+const PEDIDOS_LOCAL_KEY='rprint_pedidos_v1';
+
+function lerPedidosLocal(){
+  try{
+    const dados=JSON.parse(localStorage.getItem(PEDIDOS_LOCAL_KEY)||'[]');
+    return Array.isArray(dados)?dados:[];
+  }catch(e){
+    return [];
+  }
+}
+function gravarPedidosLocal(lista){
+  localStorage.setItem(PEDIDOS_LOCAL_KEY,JSON.stringify(lista));
+}
+function esconderPedidosPanel(){
+  document.getElementById('pedidosPanel')?.classList.remove('show');
+}
+
+/* Garante que Pedidos se comporte como uma página separada. */
+['mostrarHome','mostrarNovoOrcamento','mostrarOrcamentosSalvos','mostrarClientes','mostrarProdutosAdmin','mostrarBackup'].forEach(nome=>{
+  const original=window[nome];
+  if(typeof original==='function'){
+    window[nome]=function(){
+      esconderPedidosPanel();
+      return original.apply(this,arguments);
+    };
+  }
+});
+
+window.mostrarPedidos=function(){
+  const home=document.getElementById('homePanel');
+  const quote=document.getElementById('mainQuote');
+  const saved=document.getElementById('savedPanel');
+  const clients=document.getElementById('clientsPanel');
+  const products=document.getElementById('productsAdminPanel');
+  const backup=document.getElementById('backupPanel');
+  const pedidos=document.getElementById('pedidosPanel');
+  const topbar=document.getElementById('mainTopbar');
+
+  if(home) home.style.display='none';
+  if(quote) quote.style.display='none';
+  if(saved) saved.classList.remove('show');
+  if(clients) clients.classList.remove('show');
+  if(products) products.classList.remove('show');
+  if(backup) backup.classList.remove('show');
+  if(topbar) topbar.style.display='flex';
+  if(pedidos) pedidos.classList.add('show');
+
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('navPedidos')?.classList.add('active');
+
+  renderizarPedidos();
+  atualizarAlertaEntregasDashboard();
+};
+
+async function aprovarOrcamentoComoPedido(id){
+  const orc=await dbGet(id);
+  if(!orc){
+    alert('Orçamento não encontrado.');
+    return;
+  }
+
+  const pedidos=lerPedidosLocal();
+  if(pedidos.some(p=>Number(p.orcamentoId)===Number(id))){
+    alert('Este orçamento já foi enviado para Pedidos.');
+    return;
+  }
+
+  const pedido={
+    id:Date.now(),
+    orcamentoId:Number(id),
+    numero:orc.numero||'-',
+    cliente:orc.cliente||'Cliente não informado',
+    contato:orc.contato||'',
+    produtos:Array.isArray(orc.produtos)?JSON.parse(JSON.stringify(orc.produtos)):[],
+    observacoes:orc.observacoes||'',
+    total:Number(orc.total)||0,
+    criadoEm:new Date().toISOString(),
+    status:'Aguardando'
+  };
+
+  pedidos.push(pedido);
+  gravarPedidosLocal(pedidos);
+
+  // Marca o orçamento original como aprovado.
+  orc.aprovado=true;
+  orc.aprovadoEm=new Date().toISOString();
+  await dbPut(orc);
+
+  await renderizarHistorico();
+  alert('Orçamento aprovado e enviado para Pedidos.');
+}
+
+
+function atualizarDataEntregaPedido(id,dataEntrega){
+  const pedidos=lerPedidosLocal();
+  const i=pedidos.findIndex(p=>Number(p.id)===Number(id));
+  if(i<0)return;
+
+  pedidos[i].dataEntrega=dataEntrega||'';
+  pedidos[i].atualizadoEm=new Date().toISOString();
+  gravarPedidosLocal(pedidos);
+
+  renderizarPedidos();
+  atualizarAlertaEntregasDashboard();
+}
+
+function diasAteEntregaPedido(dataISO){
+  if(!dataISO)return null;
+  const hoje=new Date();
+  hoje.setHours(0,0,0,0);
+  const entrega=new Date(dataISO+'T12:00:00');
+  entrega.setHours(0,0,0,0);
+  return Math.round((entrega-hoje)/86400000);
+}
+
+function pedidosComAlertaEntrega(){
+  return lerPedidosLocal()
+    .filter(p=>p.status!=='Entregue' && p.dataEntrega)
+    .map(p=>({...p,diasEntrega:diasAteEntregaPedido(p.dataEntrega)}))
+    .filter(p=>p.diasEntrega!==null && p.diasEntrega<=2)
+    .sort((a,b)=>a.diasEntrega-b.diasEntrega || String(a.dataEntrega).localeCompare(String(b.dataEntrega)));
+}
+
+function atualizarAlertaEntregasDashboard(){
+  const alertas=pedidosComAlertaEntrega();
+  const card=document.getElementById('dashAlertaEntregasCard');
+  const qtd=document.getElementById('dashAlertasEntregas');
+  const txt=document.getElementById('dashAlertasEntregasTexto');
+
+  if(qtd)qtd.textContent=String(alertas.length);
+  if(card)card.classList.toggle('has-alert',alertas.length>0);
+
+  if(txt){
+    if(!alertas.length){
+      txt.textContent='Nenhuma entrega próxima';
+    }else{
+      const atrasados=alertas.filter(a=>a.diasEntrega<0).length;
+      const hoje=alertas.filter(a=>a.diasEntrega===0).length;
+      const amanha=alertas.filter(a=>a.diasEntrega===1).length;
+      const dois=alertas.filter(a=>a.diasEntrega===2).length;
+      const partes=[];
+      if(atrasados)partes.push(`${atrasados} atrasado${atrasados>1?'s':''}`);
+      if(hoje)partes.push(`${hoje} hoje`);
+      if(amanha)partes.push(`${amanha} amanhã`);
+      if(dois)partes.push(`${dois} em 2 dias`);
+      txt.textContent=partes.join(' • ');
+    }
+  }
+}
+
+function abrirAlertasEntregas(){
+  const box=document.getElementById('alertasEntregasLista');
+  const alertas=pedidosComAlertaEntrega();
+
+  if(box){
+    if(!alertas.length){
+      box.innerHTML='<div class="delivery-alert-empty">Nenhum pedido com entrega próxima ou atrasada.</div>';
+    }else{
+      box.innerHTML=alertas.map(p=>{
+        const d=p.diasEntrega;
+        const classe=d<0?'overdue':d===0?'today':d===1?'tomorrow':'';
+        const textoDias=d<0
+          ? `Atrasado ${Math.abs(d)} dia${Math.abs(d)>1?'s':''}`
+          : d===0?'Entrega hoje'
+          : d===1?'Entrega amanhã'
+          :'Entrega em 2 dias';
+
+        const entrega=new Date(p.dataEntrega+'T12:00:00').toLocaleDateString('pt-BR');
+        return `<div class="delivery-alert-item ${classe}">
+          <div>
+            <strong>Pedido ${escapar(p.numero||'-')} • ${escapar(p.cliente||'Cliente')}</strong>
+            <small>${moeda(p.total||0)} • Entrega ${entrega} • Status: ${escapar(p.status||'Aguardando')}</small>
+          </div>
+          <div class="delivery-alert-days">${textoDias}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  document.getElementById('alertasEntregasBackdrop')?.classList.add('show');
+}
+
+function fecharAlertasEntregas(){
+  document.getElementById('alertasEntregasBackdrop')?.classList.remove('show');
+}
+
+function atualizarStatusPedido(id,status){
+  const pedidos=lerPedidosLocal();
+  const i=pedidos.findIndex(p=>Number(p.id)===Number(id));
+  if(i<0)return;
+  pedidos[i].status=status;
+  pedidos[i].atualizadoEm=new Date().toISOString();
+  gravarPedidosLocal(pedidos);
+  renderizarPedidos();
+  atualizarAlertaEntregasDashboard();
+}
+
+function excluirPedido(id){
+  if(!confirm('Deseja excluir este pedido da lista?'))return;
+  const pedidos=lerPedidosLocal().filter(p=>Number(p.id)!==Number(id));
+  gravarPedidosLocal(pedidos);
+  renderizarPedidos();
+}
+
+async function abrirPdfPedido(pedidoId){
+  const pedido=lerPedidosLocal().find(p=>Number(p.id)===Number(pedidoId));
+  if(!pedido){alert('Pedido não encontrado.');return;}
+
+  await abrirDocumentoPdfNovaAba({
+    tipo:'Pedido',
+    numero:pedido.numero||'-',
+    cliente:pedido.cliente||'Cliente não informado',
+    contato:pedido.contato||'-',
+    produtos:Array.isArray(pedido.produtos)?pedido.produtos:[],
+    observacoes:pedido.observacoes||'',
+    total:Number(pedido.total)||0,
+    data:pedido.criadoEm||new Date().toISOString(),
+    status:pedido.status||'Aguardando'
+  });
+}
+
+function classeStatusPedidoCor(status){
+  const s=String(status||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(s.includes('entreg'))return 'pedido-status-entregue';
+  if(s.includes('pronto'))return 'pedido-status-pronto';
+  if(s.includes('produc'))return 'pedido-status-producao';
+  return 'pedido-status-aguardando';
+}
+
+
+const RPRINT_PAGINACAO={};
+
+function estadoPaginacaoLista(chave){
+  if(!RPRINT_PAGINACAO[chave])RPRINT_PAGINACAO[chave]={pagina:1,porPagina:20};
+  return RPRINT_PAGINACAO[chave];
+}
+function paginarLista(itens,chave){
+  const st=estadoPaginacaoLista(chave);
+  const total=itens.length;
+  const paginas=Math.max(1,Math.ceil(total/st.porPagina));
+  st.pagina=Math.min(Math.max(1,st.pagina),paginas);
+  const inicio=(st.pagina-1)*st.porPagina;
+  return {
+    itens:itens.slice(inicio,inicio+st.porPagina),
+    total,
+    paginas,
+    pagina:st.pagina,
+    porPagina:st.porPagina,
+    inicio: total ? inicio+1 : 0,
+    fim: Math.min(inicio+st.porPagina,total)
+  };
+}
+function mudarPaginaLista(chave,pagina,renderFn){
+  const st=estadoPaginacaoLista(chave);
+  st.pagina=Math.max(1,Number(pagina)||1);
+  const fn=window[renderFn];
+  if(typeof fn==='function')fn();
+}
+function mudarPorPaginaLista(chave,valor,renderFn){
+  const st=estadoPaginacaoLista(chave);
+  st.porPagina=Math.max(5,Number(valor)||20);
+  st.pagina=1;
+  const fn=window[renderFn];
+  if(typeof fn==='function')fn();
+}
+function htmlPaginacaoLista(chave,p,renderFn){
+  if(!p || p.total<=0)return '';
+  return `<div class="rprint-pagination">
+    <div class="rprint-pagination-left">
+      <span class="rprint-pagination-info">Mostrando <strong>${p.inicio}-${p.fim}</strong> de <strong>${p.total}</strong></span>
+      <span>Itens por página:</span>
+      <select onchange="mudarPorPaginaLista('${chave}',this.value,'${renderFn}')">
+        ${[10,20,50,100].map(n=>`<option value="${n}" ${p.porPagina===n?'selected':''}>${n}</option>`).join('')}
+      </select>
+    </div>
+    <div class="rprint-pagination-right">
+      <button class="rprint-page-btn" ${p.pagina<=1?'disabled':''} onclick="mudarPaginaLista('${chave}',${p.pagina-1},'${renderFn}')">‹ Anterior</button>
+      <span class="rprint-page-number">${p.pagina}</span>
+      <span>de ${p.paginas}</span>
+      <button class="rprint-page-btn" ${p.pagina>=p.paginas?'disabled':''} onclick="mudarPaginaLista('${chave}',${p.pagina+1},'${renderFn}')">Próxima ›</button>
+    </div>
+  </div>`;
+}
+
+function renderizarPedidos(){
+  const list=document.getElementById('pedidosList');
+  if(!list)return;
+
+  let pedidos=lerPedidosLocal();
