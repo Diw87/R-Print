@@ -1,0 +1,500 @@
+  font-weight:500!important;
+  cursor:pointer!important;
+  user-select:none;
+}
+.local-remember-row input{
+  width:16px!important;
+  height:16px!important;
+  min-height:16px!important;
+  padding:0!important;
+  margin:0!important;
+  accent-color:#7c3aed;
+  flex:0 0 16px;
+}
+.local-remember-row span{
+  line-height:1.35;
+}
+
+.local-switch-user-btn{
+  width:100%;
+  border:1px solid #ded6f8;
+  background:#f8f5ff;
+  border-radius:10px;
+  padding:11px 12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  text-align:left;
+  color:#4f3788;
+  cursor:pointer;
+  margin-bottom:15px;
+}
+.local-switch-user-btn:hover{
+  background:#f2edff;
+  border-color:#cdbef4;
+}
+.local-switch-user-icon{
+  width:32px;
+  height:32px;
+  flex:0 0 32px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+  background:#fff;
+  color:#7c3aed;
+  font-size:18px;
+}
+.local-switch-user-btn strong{
+  display:block;
+  font-size:12px;
+  color:#4d3586;
+}
+.local-switch-user-btn small{
+  display:block;
+  margin-top:3px;
+  color:#7a6b99;
+  font-size:10px;
+  font-weight:400;
+}
+.local-change-divider{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin:3px 0 14px;
+  color:#98a2b3;
+  font-size:9.5px;
+}
+.local-change-divider:before,
+.local-change-divider:after{
+  content:"";
+  height:1px;
+  flex:1;
+  background:#eceff3;
+}
+.local-change-divider span{white-space:nowrap}
+</style>
+
+
+<style>
+/* ===== MENU LATERAL COM ANIMAÇÃO MAIS SUAVE ===== */
+.sidebar{
+  transition:
+    width .38s cubic-bezier(.4,0,.2,1),
+    box-shadow .38s cubic-bezier(.4,0,.2,1)!important;
+}
+
+.main-with-sidebar{
+  transition:
+    margin-left .38s cubic-bezier(.4,0,.2,1)!important;
+}
+
+.sidebar-profile-text,
+.nav-label,
+.sidebar-note,
+.local-user-line,
+.local-logout .nav-label{
+  transition:
+    opacity .24s ease .07s,
+    transform .34s cubic-bezier(.4,0,.2,1),
+    width .34s cubic-bezier(.4,0,.2,1)!important;
+}
+
+/* Evita o "pulinho" dos itens inferiores ao expandir/recolher */
+.sidebar-footer{
+  overflow:hidden!important;
+}
+
+.sidebar-footer .local-user-line,
+.sidebar-footer .local-logout{
+  min-height:34px!important;
+  height:34px!important;
+  display:flex!important;
+  align-items:center!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+}
+
+.sidebar-footer .local-user-line{
+  padding-top:0!important;
+  padding-bottom:0!important;
+}
+
+.sidebar-footer .local-logout{
+  padding-top:0!important;
+  padding-bottom:0!important;
+}
+
+.sidebar-footer .local-user-line span,
+.sidebar-footer .local-logout .nav-label{
+  display:inline-block!important;
+  line-height:1!important;
+  transform:translateX(0);
+  white-space:nowrap;
+}
+
+/* Recolhido: mantém altura e posição estáveis, só esconde texto */
+.sidebar:not(.open) .sidebar-footer .local-user-line span,
+.sidebar:not(.open) .sidebar-footer .local-logout .nav-label{
+  opacity:0!important;
+  width:0!important;
+  transform:translateX(-6px)!important;
+  overflow:hidden!important;
+}
+
+/* Expandido: texto entra suavemente sem deslocar os ícones */
+.sidebar.open .sidebar-footer .local-user-line span,
+.sidebar.open .sidebar-footer .local-logout .nav-label{
+  opacity:1!important;
+  width:auto!important;
+  transform:translateX(0)!important;
+}
+
+/* Mantém ícones da parte inferior totalmente fixos */
+.sidebar-footer .local-user-line > :first-child,
+.sidebar-footer .local-logout > :first-child{
+  flex:0 0 22px!important;
+  width:22px!important;
+  min-width:22px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+
+/* Também suaviza os nomes dos itens principais */
+.sidebar:not(.open) .nav-label{
+  transform:translateX(-5px)!important;
+}
+.sidebar.open .nav-label{
+  transform:translateX(0)!important;
+}
+</style>
+
+
+<style>
+/* ===== CORREÇÃO DO RODAPÉ DO MENU ===== */
+.sidebar-footer{
+  padding:10px!important;
+  overflow:hidden!important;
+  min-height:118px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-end!important;
+  gap:4px!important;
+}
+
+.sidebar-footer .local-user-line,
+.sidebar-footer .local-logout{
+  position:relative!important;
+  width:100%!important;
+  min-height:34px!important;
+  height:34px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  box-sizing:border-box!important;
+  flex:0 0 34px!important;
+}
+
+.sidebar-footer .local-user-line{
+  color:#9cabbc!important;
+}
+
+/* Ícones ficam sempre no mesmo lugar */
+.sidebar-footer .local-user-line{
+  padding-left:9px!important;
+}
+
+.sidebar-footer .local-logout{
+  justify-content:flex-start!important;
+}
+
+.sidebar-footer .local-user-line > span,
+.sidebar-footer .local-logout .nav-label{
+  position:static!important;
+  display:block!important;
+  min-width:0!important;
+  max-width:160px!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+  text-overflow:ellipsis!important;
+  line-height:1!important;
+  transition:
+    opacity .22s ease,
+    max-width .36s cubic-bezier(.4,0,.2,1),
+    transform .30s cubic-bezier(.4,0,.2,1)!important;
+}
+
+/* Recolhido: só o texto some; a altura dos itens nunca muda */
+.sidebar:not(.open) .sidebar-footer .local-user-line > span,
+.sidebar:not(.open) .sidebar-footer .local-logout .nav-label{
+  opacity:0!important;
+  max-width:0!important;
+  transform:translateX(-5px)!important;
+}
+
+/* Expandido */
+.sidebar.open .sidebar-footer .local-user-line > span,
+.sidebar.open .sidebar-footer .local-logout .nav-label{
+  opacity:1!important;
+  max-width:160px!important;
+  transform:translateX(0)!important;
+}
+
+/* Remove qualquer regra antiga da observação que pudesse mexer no layout */
+.sidebar-note,
+.sidebar.open .sidebar-note{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+}
+</style>
+
+
+<style>
+/* ===== CORREÇÃO DOS TEXTOS DA PARTE INFERIOR DO MENU ===== */
+
+/* Mantém o rodapé estável */
+.sidebar-footer{
+  min-height:118px!important;
+  padding:10px!important;
+  gap:4px!important;
+  overflow:hidden!important;
+}
+
+/* Itens inferiores */
+.sidebar-footer .local-user-line,
+.sidebar-footer .local-logout{
+  width:100%!important;
+  height:34px!important;
+  min-height:34px!important;
+  flex:0 0 34px!important;
+  margin:0!important;
+  padding:0 9px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:8px!important;
+  overflow:hidden!important;
+  box-sizing:border-box!important;
+}
+
+/* Ícones fixos */
+.sidebar-footer .local-user-line::before{
+  flex:0 0 auto!important;
+}
+
+/* Texto do usuário */
+.sidebar-footer .local-user-line > span{
+  flex:1 1 auto!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  display:block!important;
+  opacity:1!important;
+  transform:none!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  line-height:1.2!important;
+}
+
+/* Texto de Usuários / Sair */
+.sidebar-footer .local-logout .nav-label{
+  flex:1 1 auto!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  display:block!important;
+  opacity:1!important;
+  transform:none!important;
+  overflow:hidden!important;
+  text-overflow:clip!important;
+  white-space:nowrap!important;
+  line-height:1.2!important;
+}
+
+/* Só esconde os textos quando o menu estiver realmente recolhido */
+.sidebar:not(.open) .sidebar-footer .local-user-line > span,
+.sidebar:not(.open) .sidebar-footer .local-logout .nav-label{
+  opacity:0!important;
+  width:0!important;
+  max-width:0!important;
+  flex:0 0 0!important;
+  transform:translateX(-4px)!important;
+}
+
+/* Quando expandido, libera espaço total para os nomes */
+.sidebar.open .sidebar-footer .local-user-line > span,
+.sidebar.open .sidebar-footer .local-logout .nav-label{
+  opacity:1!important;
+  width:auto!important;
+  max-width:none!important;
+  flex:1 1 auto!important;
+  transform:translateX(0)!important;
+}
+
+/* Evita reticências nos itens Usuários e Sair */
+.sidebar.open .sidebar-footer .local-logout{
+  overflow:visible!important;
+}
+.sidebar.open .sidebar-footer .local-logout .nav-label{
+  overflow:visible!important;
+  text-overflow:clip!important;
+}
+
+/* Mantém a observação removida */
+.sidebar-note,
+.sidebar.open .sidebar-note{
+  display:none!important;
+}
+</style>
+
+
+<style>
+/* ===== ALINHAMENTO E ÍCONES DO RODAPÉ IGUAIS AO MENU PRINCIPAL ===== */
+.sidebar-footer{
+  padding-left:7px!important;
+  padding-right:7px!important;
+}
+
+/* Mesma caixa e mesmo recuo horizontal dos itens superiores */
+.sidebar-footer .local-user-line,
+.sidebar-footer .local-logout{
+  width:100%!important;
+  height:38px!important;
+  min-height:38px!important;
+  flex:0 0 38px!important;
+  padding:0 12px!important;
+  margin:0!important;
+  gap:12px!important;
+  border-radius:8px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+}
+
+/* Ícones padronizados */
+.sidebar-bottom-icon,
+.sidebar-footer .local-user-icon{
+  width:18px!important;
+  min-width:18px!important;
+  height:18px!important;
+  flex:0 0 18px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  margin:0!important;
+  color:#aeb9c8!important;
+}
+
+.sidebar-bottom-icon svg,
+.sidebar-footer .local-user-icon svg{
+  width:17px!important;
+  height:17px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:1.8!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+/* Usuários ganha o mesmo comportamento visual dos demais itens */
+.sidebar-footer .local-logout:hover{
+  background:rgba(255,255,255,.06)!important;
+}
+
+/* Texto começa exatamente na mesma linha visual dos nomes de cima */
+.sidebar-footer .local-user-line > span:last-child,
+.sidebar-footer .local-logout .nav-label{
+  margin:0!important;
+  padding:0!important;
+  line-height:38px!important;
+  font-size:12px!important;
+  white-space:nowrap!important;
+}
+
+/* Sem deslocamento vertical durante a animação */
+.sidebar-footer,
+.sidebar-footer *{
+  vertical-align:middle!important;
+}
+</style>
+
+
+<style>
+/* ===== RODAPÉ DO MENU: MESMO ALINHAMENTO DOS ITENS PRINCIPAIS ===== */
+.sidebar-footer{
+  padding:10px!important;
+  min-height:126px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-end!important;
+  gap:4px!important;
+  overflow:hidden!important;
+}
+
+.sidebar-bottom-item{
+  width:100%!important;
+  height:36px!important;
+  min-height:36px!important;
+  flex:0 0 36px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-start!important;
+  gap:9px!important;
+  padding:8px 9px!important;
+  margin:0!important;
+  border-radius:9px!important;
+  box-sizing:border-box!important;
+  color:#ecf1f7!important;
+  background:transparent!important;
+  border:0!important;
+  text-align:left!important;
+  font-size:13px!important;
+  font-weight:650!important;
+  line-height:1!important;
+  overflow:hidden!important;
+}
+
+button.sidebar-bottom-item{
+  cursor:pointer!important;
+}
+button.sidebar-bottom-item:hover{
+  background:rgba(255,255,255,.07)!important;
+}
+
+.sidebar-bottom-icon{
+  width:25px!important;
+  height:25px!important;
+  min-width:25px!important;
+  flex:0 0 25px!important;
+  display:grid!important;
+  place-items:center!important;
+  color:#d8e0eb!important;
+}
+.sidebar-bottom-icon svg{
+  width:17px!important;
+  height:17px!important;
+  fill:none!important;
+  stroke:currentColor!important;
+  stroke-width:1.8!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+}
+
+.sidebar-bottom-label{
+  display:block!important;
+  flex:1 1 auto!important;
+  min-width:0!important;
+  max-width:170px!important;
+  overflow:hidden!important;
+  white-space:nowrap!important;
+  text-overflow:ellipsis!important;
+  opacity:1!important;
