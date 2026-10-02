@@ -1,0 +1,499 @@
+  }
+  if(p1!==p2){
+    msg.textContent='As senhas não conferem.';
+    return;
+  }
+
+  const passHash=await rprintHash(p1);
+  const hint=(document.getElementById('localSetupHint')?.value||'').trim();
+  const users=[{
+    id:Date.now(),
+    user,
+    passHash,
+    hint,
+    criadoEm:new Date().toISOString()
+  }];
+  rprintSaveUsers(users);
+  sessionStorage.setItem(RPRINT_LOCAL_SESSION_KEY,user);
+  rprintOpenApp(user);
+}
+
+
+function rprintGetRememberedAccess(){
+  try{return JSON.parse(localStorage.getItem(RPRINT_LOCAL_REMEMBER_KEY)||'null')}catch(e){return null}
+}
+function rprintSaveRememberedAccess(user,pass){
+  localStorage.setItem(RPRINT_LOCAL_REMEMBER_KEY,JSON.stringify({user,pass}));
+}
+function rprintClearRememberedAccess(){
+  localStorage.removeItem(RPRINT_LOCAL_REMEMBER_KEY);
+}
+function rprintPreencherAcessoLembrado(){
+  const lembrado=rprintGetRememberedAccess();
+  const userInput=document.getElementById('localLoginUser');
+  const passInput=document.getElementById('localLoginPass');
+  const check=document.getElementById('localRememberAccess');
+
+  if(lembrado && lembrado.user){
+    if(userInput) userInput.value=lembrado.user||'';
+    if(passInput) passInput.value=lembrado.pass||'';
+    if(check) check.checked=true;
+    return true;
+  }
+  if(check) check.checked=false;
+  return false;
+}
+
+let rprintTentativasLogin=0;
+
+async function entrarLoginLocal(event){
+  event.preventDefault();
+  const user=document.getElementById('localLoginUser').value.trim();
+  const login=rprintFindUser(user);
+  const pass=document.getElementById('localLoginPass').value;
+  const msg=document.getElementById('localLoginMsg');
+  const hintBox=document.getElementById('localPasswordHint');
+  msg.textContent='';
+
+  if(!login){
+    const users=rprintGetUsers();
+    if(!users.length){
+      rprintShowSetup();
+      return;
+    }
+    rprintTentativasLogin++;
+    msg.textContent='Usuário ou senha incorretos.';
+    return;
+  }
+
+  const passHash=await rprintHash(pass);
+  if(passHash!==login.passHash){
+    rprintTentativasLogin++;
+    msg.textContent='Usuário ou senha incorretos.';
+
+    if(rprintTentativasLogin>=3){
+      if(login.hint){
+        hintBox.textContent='💡 Dica da senha: '+login.hint;
+      }else{
+        hintBox.textContent='💡 Nenhuma dica de senha foi cadastrada.';
+      }
+      hintBox.classList.add('show');
+    }
+    return;
+  }
+
+  rprintTentativasLogin=0;
+
+  const lembrar=document.getElementById('localRememberAccess')?.checked;
+  if(lembrar){
+    rprintSaveRememberedAccess(user,pass);
+  }else{
+    rprintClearRememberedAccess();
+  }
+
+  if(hintBox){
+    hintBox.classList.remove('show');
+    hintBox.textContent='';
+  }
+  sessionStorage.setItem(RPRINT_LOCAL_SESSION_KEY,user);
+  rprintOpenApp(user);
+}
+
+function sairLoginLocal(){
+  sessionStorage.removeItem(RPRINT_LOCAL_SESSION_KEY);
+  rprintTentativasLogin=0;
+
+  const hintBox=document.getElementById('localPasswordHint');
+  if(hintBox){
+    hintBox.classList.remove('show');
+    hintBox.textContent='';
+  }
+
+  document.getElementById('localLoginScreen')?.classList.remove('hidden');
+  rprintShowLogin();
+
+  const lembrou=rprintPreencherAcessoLembrado();
+  if(!lembrou){
+    const u=document.getElementById('localLoginUser');
+    const p=document.getElementById('localLoginPass');
+    if(u)u.value='';
+    if(p)p.value='';
+  }
+
+  setTimeout(()=>{
+    const alvo=lembrou ? document.getElementById('localLoginPass') : document.getElementById('localLoginUser');
+    alvo?.focus();
+  },50);
+}
+
+function inicializarLoginLocal(){
+  const users=rprintGetUsers();
+  const session=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+
+  if(!users.length){
+    rprintShowSetup();
+    return;
+  }
+
+  const atual=session ? users.find(u=>u.user===session) : null;
+  if(atual){
+    rprintOpenApp(atual.user);
+    return;
+  }
+
+  rprintShowLogin();
+
+  const lembrou=rprintPreencherAcessoLembrado();
+  if(!lembrou){
+    document.getElementById('localLoginUser').value='';
+    document.getElementById('localLoginPass').value='';
+  }
+
+  setTimeout(()=>{
+    const alvo=lembrou ? document.getElementById('localLoginPass') : document.getElementById('localLoginUser');
+    alvo?.focus();
+  },50);
+}
+
+window.addEventListener('load',inicializarLoginLocal);
+</script>
+
+
+<div id="localChangeAccessBackdrop" class="local-change-backdrop">
+  <div class="local-change-modal">
+    <div class="local-change-head">
+      <div>
+        <h2>Alterar acesso</h2>
+        <p>Altere seus dados de acesso ou entre com outro usuário.</p>
+      </div>
+      <button type="button" class="local-change-close" onclick="fecharAlterarAcessoLocal()">×</button>
+    </div>
+    <form onsubmit="salvarAlteracaoAcessoLocal(event)">
+      <div class="local-change-body">
+        <button type="button" class="local-switch-user-btn" onclick="trocarUsuarioLocal()">
+          <span class="local-switch-user-icon">⇄</span>
+          <span>
+            <strong>Trocar de usuário</strong>
+            <small>Voltar à tela de login e entrar com outro usuário cadastrado.</small>
+          </span>
+        </button>
+
+        <div class="local-change-divider"><span>ou altere seu acesso atual</span></div>
+
+        <div class="field">
+          <label for="changeCurrentPass">Senha atual</label>
+          <input id="changeCurrentPass" type="password" autocomplete="current-password" placeholder="Digite sua senha atual" required>
+        </div>
+        <div class="field">
+          <label for="changeNewUser">Novo nome de usuário</label>
+          <input id="changeNewUser" autocomplete="username" placeholder="Digite o novo usuário" required>
+        </div>
+        <div class="field">
+          <label for="changeNewPass">Nova senha</label>
+          <input id="changeNewPass" type="password" autocomplete="new-password" placeholder="Digite a nova senha" minlength="4" required>
+        </div>
+        <div class="field">
+          <label for="changeNewPass2">Confirmar nova senha</label>
+          <input id="changeNewPass2" type="password" autocomplete="new-password" placeholder="Digite a nova senha novamente" minlength="4" required>
+        </div>
+        <div class="field">
+          <label for="changeNewHint">Dica da senha</label>
+          <input id="changeNewHint" placeholder="Ex.: nome do meu cachorro">
+        </div>
+        <div id="changeAccessMsg" class="local-login-msg"></div>
+      </div>
+      <div class="local-change-footer">
+        <button type="button" class="btn btn-light" onclick="fecharAlterarAcessoLocal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar alterações</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<script>
+
+function trocarUsuarioLocal(){
+  fecharAlterarAcessoLocal();
+
+  // Encerra somente a sessão atual. Usuários e dados continuam salvos.
+  sessionStorage.removeItem(RPRINT_LOCAL_SESSION_KEY);
+  rprintTentativasLogin=0;
+
+  const hintBox=document.getElementById('localPasswordHint');
+  if(hintBox){
+    hintBox.classList.remove('show');
+    hintBox.textContent='';
+  }
+
+  document.getElementById('localLoginScreen')?.classList.remove('hidden');
+  rprintShowLogin();
+
+  const lembrou=rprintPreencherAcessoLembrado();
+
+  // Se o acesso lembrado for do usuário atual, deixamos preenchido.
+  // Para entrar com outro usuário, basta substituir o nome/senha.
+  if(!lembrou){
+    const u=document.getElementById('localLoginUser');
+    const p=document.getElementById('localLoginPass');
+    if(u)u.value='';
+    if(p)p.value='';
+  }
+
+  setTimeout(()=>document.getElementById('localLoginUser')?.focus(),50);
+}
+
+function abrirAlterarAcessoLocal(){
+  const login=rprintGetLogin();
+  if(!login)return;
+  const user=document.getElementById('changeNewUser');
+  if(user) user.value=login.user||'';
+  const hint=document.getElementById('changeNewHint');
+  if(hint) hint.value=login.hint||'';
+  ['changeCurrentPass','changeNewPass','changeNewPass2'].forEach(id=>{
+    const el=document.getElementById(id); if(el)el.value='';
+  });
+  const msg=document.getElementById('changeAccessMsg');
+  if(msg)msg.textContent='';
+  document.getElementById('localChangeAccessBackdrop')?.classList.add('show');
+  setTimeout(()=>document.getElementById('changeCurrentPass')?.focus(),50);
+}
+function fecharAlterarAcessoLocal(){
+  document.getElementById('localChangeAccessBackdrop')?.classList.remove('show');
+}
+async function salvarAlteracaoAcessoLocal(event){
+  event.preventDefault();
+  const login=rprintGetLogin();
+  const msg=document.getElementById('changeAccessMsg');
+  if(msg)msg.textContent='';
+  if(!login)return;
+
+  const atual=document.getElementById('changeCurrentPass').value;
+  const novoUsuario=document.getElementById('changeNewUser').value.trim();
+  const novaSenha=document.getElementById('changeNewPass').value;
+  const confirma=document.getElementById('changeNewPass2').value;
+  const novaDica=(document.getElementById('changeNewHint')?.value||'').trim();
+
+  const hashAtual=await rprintHash(atual);
+  if(hashAtual!==login.passHash){
+    msg.textContent='A senha atual está incorreta.';
+    return;
+  }
+  if(!novoUsuario){
+    msg.textContent='Digite o novo nome de usuário.';
+    return;
+  }
+  if(novaSenha.length<4){
+    msg.textContent='A nova senha precisa ter pelo menos 4 caracteres.';
+    return;
+  }
+  if(novaSenha!==confirma){
+    msg.textContent='As novas senhas não conferem.';
+    return;
+  }
+
+  const novoHash=await rprintHash(novaSenha);
+  const users=rprintGetUsers();
+  const usuarioAtual=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+  const idx=users.findIndex(u=>u.user===usuarioAtual);
+  if(idx<0){
+    msg.textContent='Usuário atual não encontrado.';
+    return;
+  }
+  if(users.some((u,i)=>i!==idx && u.user===novoUsuario)){
+    msg.textContent='Esse nome de usuário já está em uso.';
+    return;
+  }
+  users[idx]={
+    ...users[idx],
+    user:novoUsuario,
+    passHash:novoHash,
+    hint:novaDica,
+    alteradoEm:new Date().toISOString()
+  };
+  rprintSaveUsers(users);
+
+  const lembrado=rprintGetRememberedAccess();
+  if(lembrado && lembrado.user===usuarioAtual){
+    rprintSaveRememberedAccess(novoUsuario,novaSenha);
+  }
+
+  sessionStorage.setItem(RPRINT_LOCAL_SESSION_KEY,novoUsuario);
+  const atualEl=document.getElementById('localCurrentUser');
+  if(atualEl)atualEl.textContent=novoUsuario;
+
+  fecharAlterarAcessoLocal();
+  alert('Usuário e senha alterados com sucesso.');
+}
+</script>
+
+
+<div id="localUsersBackdrop" class="local-users-backdrop">
+  <div class="local-users-modal">
+    <div class="local-users-head">
+      <div>
+        <h2>Usuários do sistema</h2>
+        <p>Cadastre novos usuários com senha e dica próprias.</p>
+      </div>
+      <button type="button" class="local-users-close" onclick="fecharGerenciarUsuariosLocais()">×</button>
+    </div>
+
+    <div class="local-users-body">
+      <form class="local-user-create" onsubmit="salvarNovoUsuarioLocal(event)">
+        <div class="field">
+          <label for="newLocalUserName">Nome de usuário</label>
+          <input id="newLocalUserName" placeholder="Ex.: atendente" required>
+        </div>
+        <div class="field">
+          <label for="newLocalUserPass">Senha</label>
+          <input id="newLocalUserPass" type="password" minlength="4" placeholder="Crie uma senha" required>
+        </div>
+        <div class="field">
+          <label for="newLocalUserPass2">Confirmar senha</label>
+          <input id="newLocalUserPass2" type="password" minlength="4" placeholder="Digite a senha novamente" required>
+        </div>
+        <div class="field">
+          <label for="newLocalUserHint">Dica da senha</label>
+          <input id="newLocalUserHint" placeholder="Ex.: apelido de infância">
+        </div>
+        <div id="newLocalUserMsg" class="local-login-msg full"></div>
+        <div class="local-user-create-actions">
+          <button type="submit" class="btn btn-primary">Adicionar usuário</button>
+        </div>
+      </form>
+
+      <div class="local-users-list">
+        <h3>Usuários cadastrados</h3>
+        <div id="localUsersList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+
+function rprintUsuarioAtual(){
+  const nome=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+  return rprintGetUsers().find(u=>u.user===nome)||null;
+}
+
+function atualizarFotoUsuarioMenu(){
+  const user=rprintUsuarioAtual();
+  const img=document.getElementById('localCurrentUserPhoto');
+  const fallback=document.getElementById('localCurrentUserFallback');
+
+  if(!img || !fallback) return;
+
+  const foto=(user && user.photo) ? String(user.photo) : '';
+
+  if(foto){
+    img.onload=()=>{
+      img.style.display='block';
+      img.classList.add('show');
+      fallback.style.display='none';
+      fallback.classList.add('hide');
+    };
+    img.onerror=()=>{
+      img.style.display='none';
+      img.classList.remove('show');
+      fallback.style.display='grid';
+      fallback.classList.remove('hide');
+    };
+    img.src=foto;
+
+    // Para data URLs já em cache, força o estado visual imediatamente.
+    if(img.complete){
+      img.style.display='block';
+      img.classList.add('show');
+      fallback.style.display='none';
+      fallback.classList.add('hide');
+    }
+  }else{
+    img.removeAttribute('src');
+    img.style.display='none';
+    img.classList.remove('show');
+    fallback.style.display='grid';
+    fallback.classList.remove('hide');
+  }
+}
+
+function abrirPerfilUsuarioLocal(){
+  const user=rprintUsuarioAtual();
+  if(!user)return;
+
+  const name=document.getElementById('localUserProfileName');
+  if(name)name.textContent=user.user||'Usuário';
+
+  const img=document.getElementById('localUserProfilePhotoPreview');
+  const fallback=document.getElementById('localUserProfileFallback');
+
+  if(user.photo){
+    img.src=user.photo;
+    img.style.display='block';
+    img.classList.add('show');
+    fallback.style.display='none';
+    fallback.classList.add('hide');
+  }else{
+    img.removeAttribute('src');
+    img.style.display='none';
+    img.classList.remove('show');
+    fallback.style.display='grid';
+    fallback.classList.remove('hide');
+  }
+
+  document.getElementById('localUserProfileBackdrop')?.classList.add('show');
+}
+function fecharPerfilUsuarioLocal(){
+  document.getElementById('localUserProfileBackdrop')?.classList.remove('show');
+}
+
+function alterarFotoUsuarioLocal(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){
+    alert('Selecione uma imagem válida.');
+    return;
+  }
+
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const users=rprintGetUsers();
+    const atual=sessionStorage.getItem(RPRINT_LOCAL_SESSION_KEY);
+    const idx=users.findIndex(u=>u.user===atual);
+    if(idx<0)return;
+
+    users[idx].photo=String(reader.result||'');
+    rprintSaveUsers(users);
+
+    const fotoNova=users[idx].photo;
+
+    const avatar=document.getElementById('localCurrentUserPhoto');
+    const avatarFallback=document.getElementById('localCurrentUserFallback');
+    if(avatar && fotoNova){
+      avatar.src=fotoNova;
+      avatar.style.display='block';
+      avatar.classList.add('show');
+    }
+    if(avatarFallback){
+      avatarFallback.style.display='none';
+      avatarFallback.classList.add('hide');
+    }
+
+    const preview=document.getElementById('localUserProfilePhotoPreview');
+    const previewFallback=document.getElementById('localUserProfileFallback');
+    if(preview && fotoNova){
+      preview.src=fotoNova;
+      preview.style.display='block';
+      preview.classList.add('show');
+    }
+    if(previewFallback){
+      previewFallback.style.display='none';
+      previewFallback.classList.add('hide');
+    }
+
+    atualizarFotoUsuarioMenu();
+    renderUsuariosLocais();
+  };
+  reader.readAsDataURL(file);
+}
