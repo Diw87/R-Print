@@ -1,0 +1,500 @@
+  const btnProximo=document.getElementById('dashboardMesProximo');
+  if(btnProximo){
+    btnProximo.disabled=
+      ref.getFullYear()===atual.getFullYear() &&
+      ref.getMonth()===atual.getMonth();
+  }
+
+  renderFinanceChart(ref);
+  atualizarAlertaDespesasDashboard();
+  atualizarAlertaEntregasDashboard();
+}
+function renderFinanceChart(dataReferencia){
+  const box=document.getElementById('financeChart');if(!box)return;
+  const now=dataReferencia||dashboardDataSelecionada||mesAtualDashboard(),dados=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1),ini=new Date(d.getFullYear(),d.getMonth(),1),fim=new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59);
+    const r=pagamentosNoPeriodo(ini,fim).reduce((s,p)=>s+Number(p.valor||0),0),e=despesasPagasNoPeriodo(ini,fim).reduce((s,x)=>s+Number(x.valor||0),0);
+    dados.push({label:d.toLocaleDateString('pt-BR',{month:'short'}).replace('.',''),r,e});
+  }
+  const max=Math.max(1,...dados.flatMap(x=>[x.r,x.e]));
+  box.innerHTML=dados.map(x=>`<div class="finance-month-group"><div class="finance-bars"><div class="finance-bar receita" title="Receitas: ${moedaFinance(x.r)}" style="height:${Math.max(3,x.r/max*140)}px"></div><div class="finance-bar despesa" title="Despesas: ${moedaFinance(x.e)}" style="height:${Math.max(3,x.e/max*140)}px"></div></div><div class="finance-month-label">${x.label}</div><div class="finance-legend">R / D</div></div>`).join('');
+}
+</script>
+
+
+<script>
+async function visualizarPdfOrcamentoSalvo(id){
+  const x=await dbGet(id);
+  if(!x){alert('Orçamento não encontrado.');return;}
+
+  await abrirDocumentoPdfNovaAba({
+    tipo:'Orçamento',
+    numero:x.numero||'-',
+    cliente:x.cliente||'Cliente não informado',
+    contato:x.contato||'-',
+    produtos:Array.isArray(x.produtos)?x.produtos:[],
+    observacoes:x.observacoes||'',
+    total:Number(x.total)||0,
+    data:x.atualizadoEm||new Date().toISOString()
+  });
+}
+</script>
+
+
+<script>
+async function rprintImagemDataUrl(img){
+  if(!img || !img.src)return null;
+  try{
+    if(img.src.startsWith('data:image/')) return img.src;
+    const canvas=document.createElement('canvas');
+    const w=img.naturalWidth||img.width||180, h=img.naturalHeight||img.height||80;
+    canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    return canvas.toDataURL('image/png');
+  }catch(e){return null}
+}
+
+async function abrirDocumentoPdfNovaAba(docData){
+  if(!window.jspdf || !window.jspdf.jsPDF){
+    alert('Não foi possível carregar o gerador de PDF. Verifique sua conexão com a internet e tente novamente.');
+    return;
+  }
+
+  // Abre a aba imediatamente para evitar bloqueio de pop-up.
+  const aba=window.open('about:blank','_blank');
+  if(!aba){
+    alert('O navegador bloqueou a nova aba. Permita pop-ups para esta página e tente novamente.');
+    return;
+  }
+  aba.document.write('<title>Gerando PDF...</title><body style="font-family:Arial;padding:30px;color:#555">Gerando PDF...</body>');
+
+  try{
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=210, margin=15;
+    let y=15;
+
+    const cliente=String(docData.cliente||'Cliente não informado');
+    const contato=String(docData.contato||'-');
+    const numero=String(docData.numero||'-');
+    const produtos=Array.isArray(docData.produtos)?docData.produtos:[];
+    const total=Number(docData.total)||produtos.reduce((s,p)=>s+(Number(p.total)||0),0);
+    const dataBase=docData.data?new Date(docData.data):new Date();
+
+    // Logo
+    const empresaCfgLogo=obterDadosEmpresa();
+    let logoData=null;
+    if(empresaCfgLogo.logo){
+      logoData=empresaCfgLogo.logo;
+    }else{
+      const logo=document.querySelector('.brand-logo') || document.querySelector('.sidebar-avatar img');
+      logoData=await rprintImagemDataUrl(logo);
+    }
+    if(logoData){
+      try{
+        const props=pdf.getImageProperties(logoData);
+        const maxW=42,maxH=18,ratio=Math.min(maxW/props.width,maxH/props.height);
+        pdf.addImage(logoData,'PNG',margin,y,props.width*ratio,props.height*ratio);
+      }catch(e){}
+    }
+
+    pdf.setTextColor(29,41,57);
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(17);
+    pdf.text(`${docData.tipo} ${numero}`, W-margin, y+7, {align:'right'});
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(105,116,132);
+    pdf.text(
+      `${docData.tipo==='Pedido'?'Data do Pedido':'Data do Orçamento'}: ${dataBase.toLocaleDateString('pt-BR')} - ${dataBase.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`,
+      W-margin,y+13,{align:'right'}
+    );
+
+    y=40;
+    pdf.setDrawColor(225,229,235);
+    pdf.line(margin,y,W-margin,y);
+    y+=8;
+
+    // Dados da empresa + cliente, seguindo o PDF original do sistema.
+    const colEmpresa=margin;
+    const colCliente=112;
+
+    pdf.setTextColor(40,50,66);
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(10);
+    pdf.text('Dados da Empresa',colEmpresa,y);
+    pdf.text('Dados do Cliente',colCliente,y);
+
+    y+=6;
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(8.3);
+    pdf.setTextColor(70,80,95);
+
+    async function obterIconesOriginaisPdf(){
+      // Estes são exatamente os mesmos SVGs usados no PDF do botão
+      // Imprimir da tela Novo Orçamento.
+      const svgs={
+        empresa:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#123a6d"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8z"/></svg>`,
+        cnpj:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#123a6d" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>`,
+        telefone:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#123a6d" stroke-width="2.2"><path d="M6.6 3.5l3 3-2 2.5c1.5 3 3.5 5 6.5 6.5l2.5-2 3 3c-1 2.5-3 4-5.5 3.5C8.5 18.8 5.2 15.5 4 9.9 3.5 7.4 4.1 4.5 6.6 3.5z"/></svg>`,
+        instagram:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#123a6d" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#123a6d" stroke="none"/></svg>`,
+        email:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#123a6d" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M4 7l8 6 8-6"/></svg>`,
+        endereco:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#123a6d"><path d="M12 2a7 7 0 00-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6a2.5 2.5 0 010 5.5z"/></svg>`
+      };
+
+      async function svgTextoParaPng(svgTxt){
+        return new Promise(resolve=>{
+          try{
+            const blob=new Blob([svgTxt],{type:'image/svg+xml'});
+            const url=URL.createObjectURL(blob);
+            const img=new Image();
+            img.onload=()=>{
+              try{
+                const canvas=document.createElement('canvas');
+                canvas.width=96;canvas.height=96;
+                const ctx=canvas.getContext('2d');
+                ctx.clearRect(0,0,96,96);
+                ctx.drawImage(img,0,0,96,96);
+                const png=canvas.toDataURL('image/png');
+                URL.revokeObjectURL(url);
+                resolve(png);
+              }catch(e){
+                URL.revokeObjectURL(url);
+                resolve(null);
+              }
+            };
+            img.onerror=()=>{URL.revokeObjectURL(url);resolve(null)};
+            img.src=url;
+          }catch(e){resolve(null)}
+        });
+      }
+
+      const mapa={};
+      for(const [tipo,svg] of Object.entries(svgs)){
+        mapa[tipo]=await svgTextoParaPng(svg);
+      }
+      return mapa;
+    }
+
+    const iconesOriginais=await obterIconesOriginaisPdf();
+
+    function desenharIconeEmpresa(tipo,x,yIcon){
+      const data=iconesOriginais[tipo];
+      if(data){
+        try{
+          pdf.addImage(data,'PNG',x,yIcon-3.7,4.8,4.8);
+        }catch(e){}
+      }
+    }
+
+    const empresaCfg=obterDadosEmpresa();
+    const cidadeUf=[empresaCfg.cidade||'',empresaCfg.uf||''].filter(Boolean).join('-');
+    const empresaLinhas=[
+      ['empresa',empresaCfg.nome||'R-Print'],
+      ['cnpj',empresaCfg.cnpj ? `CNPJ: ${empresaCfg.cnpj}` : ''],
+      ['telefone',empresaCfg.telefone||''],
+      ['instagram',empresaCfg.instagram||''],
+      ['email',empresaCfg.email||''],
+      ['endereco',empresaCfg.endereco||''],
+      ['endereco',[cidadeUf,empresaCfg.cep||''].filter(Boolean).join(', ')]
+    ].filter(item=>item[1]);
+
+    let yEmpresa=y;
+    empresaLinhas.forEach(([tipo,linha])=>{
+      desenharIconeEmpresa(tipo,colEmpresa,yEmpresa);
+      pdf.setTextColor(70,80,95);
+      pdf.text(linha,colEmpresa+7,yEmpresa);
+      yEmpresa+=4.8;
+    });
+
+    pdf.setFont('helvetica','bold');
+    pdf.text('Cliente:',colCliente,y);
+    pdf.setFont('helvetica','normal');
+    const clienteLinhas=pdf.splitTextToSize(cliente,78);
+    pdf.text(clienteLinhas,colCliente+14,y);
+
+    let yCliente=y + Math.max(6,clienteLinhas.length*4.2+2);
+    pdf.setFont('helvetica','bold');
+    pdf.text('Contato:',colCliente,yCliente);
+    pdf.setFont('helvetica','normal');
+    const contatoLinhas=pdf.splitTextToSize(contato,76);
+    pdf.text(contatoLinhas,colCliente+15,yCliente);
+
+    y=Math.max(yEmpresa,yCliente+contatoLinhas.length*4.2)+5;
+    pdf.setDrawColor(232,235,240);
+    pdf.line(margin,y,W-margin,y);
+    y+=7;
+
+    // Table header
+    const xDesc=margin, xUnit=125, xQtd=157, xTotal=178;
+    pdf.setFillColor(244,246,249);
+    pdf.roundedRect(margin,y,W-margin*2,9,2,2,'F');
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(8);
+    pdf.setTextColor(62,72,88);
+    pdf.text('Produto / Serviço',xDesc+2,y+5.8);
+    pdf.text('Preço Unit.',xUnit,y+5.8);
+    pdf.text('Qtd.',xQtd,y+5.8);
+    pdf.text('Total',xTotal,y+5.8);
+    y+=12;
+
+    pdf.setFont('helvetica','normal');
+    pdf.setFontSize(8.5);
+    for(const p of produtos){
+      const descricao=String(p.descricao||'Produto');
+      const linhas=pdf.splitTextToSize(descricao,103);
+      const rowH=Math.max(9,linhas.length*4.2+3);
+
+      if(y+rowH>270){
+        pdf.addPage();
+        y=18;
+      }
+
+      const precoUnitario=p.calculoArea ? (Number(p.total)||0) : (Number(p.venda)||0);
+      pdf.setTextColor(45,55,70);
+      pdf.text(linhas,xDesc+2,y+4);
+      pdf.text(moeda(precoUnitario),xUnit,y+4);
+      pdf.text(String(p.qtd||1),xQtd+4,y+4,{align:'center'});
+      pdf.text(moeda(Number(p.total)||0),W-margin-2,y+4,{align:'right'});
+      pdf.setDrawColor(236,239,243);
+      pdf.line(margin,y+rowH-1,W-margin,y+rowH-1);
+      y+=rowH;
+    }
+
+    y+=5;
+    if(y>250){pdf.addPage();y=18}
+
+    const subtotal=produtos.reduce((s,p)=>s+(Number(p.total)||0),0);
+    pdf.setFontSize(9);
+    pdf.setTextColor(95,105,120);
+    pdf.text('Subtotal',150,y);
+    pdf.text(moeda(subtotal),W-margin,y,{align:'right'});
+    y+=7;
+    pdf.setFont('helvetica','bold');
+    pdf.setFontSize(12);
+    pdf.setTextColor(29,41,57);
+    pdf.text('TOTAL',150,y);
+    pdf.text(moeda(total),W-margin,y,{align:'right'});
+    y+=11;
+
+    if(docData.status){
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(124,58,237);
+      pdf.text(`Status: ${docData.status}`,margin,y);
+      y+=8;
+    }
+
+    if(docData.observacoes){
+      pdf.setFont('helvetica','bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(55,65,80);
+      pdf.text('Observações',margin,y);
+      y+=5;
+      pdf.setFont('helvetica','normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(80,90,105);
+      const obs=pdf.splitTextToSize(String(docData.observacoes),W-margin*2);
+      pdf.text(obs,margin,y);
+    }
+
+    const blob=pdf.output('blob');
+    const url=URL.createObjectURL(blob);
+    aba.location.href=url;
+
+    // O nome é usado quando o usuário baixa o PDF pelo visualizador do navegador.
+    const nomeSeguro=cliente.replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
+    const numSeguro=numero.replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim();
+    try{pdf.setProperties({title:`${nomeSeguro} - ${docData.tipo} ${numSeguro}`})}catch(e){}
+    setTimeout(()=>URL.revokeObjectURL(url),120000);
+  }catch(err){
+    console.error(err);
+    aba.close();
+    alert('Não foi possível gerar o PDF.');
+  }
+}
+</script>
+
+
+<script>
+const RPRINT_EMPRESA_KEY='rprint_empresa_v1';
+const RPRINT_EMPRESA_PADRAO={
+  nome:'R-Print',
+  cnpj:'53.705.650/0001-07',
+  telefone:'(98) 9 8505-0600',
+  instagram:'@_r_print.cv',
+  email:'m.rafael.fo@gmail.com',
+  endereco:'Rua 24 Maio, sn - Bairro Paulista',
+  cidade:'Vitorino Freire',
+  uf:'MA',
+  cep:'65320-000',
+  logo:''
+};
+
+function obterDadosEmpresa(){
+  try{
+    const salvo=JSON.parse(localStorage.getItem(RPRINT_EMPRESA_KEY)||'null');
+    return {...RPRINT_EMPRESA_PADRAO,...(salvo||{})};
+  }catch(e){
+    return {...RPRINT_EMPRESA_PADRAO};
+  }
+}
+function salvarEmpresaStorage(dados){
+  localStorage.setItem(RPRINT_EMPRESA_KEY,JSON.stringify(dados));
+}
+function localizarNomeEmpresaMenu(){
+  let alvo=document.querySelector('[data-company-menu-name]');
+  if(alvo)return alvo;
+
+  const logo=document.querySelector('.sidebar-avatar img') || document.querySelector('.brand-logo');
+  if(!logo)return null;
+
+  const area=logo.closest('.sidebar-brand,.brand,.sidebar-top,.sidebar-header') || logo.parentElement?.parentElement || logo.parentElement;
+  if(!area)return null;
+
+  const candidatos=[...area.querySelectorAll('span,strong,b,h1,h2,h3,div,p')].filter(el=>{
+    if(el===logo || el.contains(logo))return false;
+    const t=(el.textContent||'').trim();
+    return t && t.length<=40 && !el.querySelector('svg,img,button,input');
+  });
+
+  alvo=candidatos.find(el=>/r[- ]?print/i.test((el.textContent||'').trim())) || candidatos[0] || null;
+  if(alvo)alvo.setAttribute('data-company-menu-name','1');
+  return alvo;
+}
+
+function aplicarDadosEmpresa(){
+  const e=obterDadosEmpresa();
+
+  if(e.logo){
+    document.querySelectorAll('.sidebar-avatar img,.brand-logo,#pqLogo').forEach(img=>{if(img)img.src=e.logo});
+  }
+
+  const nomeMenu=localizarNomeEmpresaMenu();
+  if(nomeMenu)nomeMenu.textContent=e.nome||'R-Print';
+
+  document.querySelectorAll('[data-company-name]').forEach(el=>{
+    el.textContent=e.nome||'R-Print';
+  });
+}
+function carregarFormularioEmpresa(){
+  const e=obterDadosEmpresa();
+  const mapa={
+    empresaNome:e.nome,empresaCnpj:e.cnpj,empresaTelefone:e.telefone,
+    empresaInstagram:e.instagram,empresaEmail:e.email,empresaCep:e.cep,
+    empresaEndereco:e.endereco,empresaCidade:e.cidade,empresaUf:e.uf
+  };
+  Object.entries(mapa).forEach(([id,val])=>{const el=document.getElementById(id);if(el)el.value=val||''});
+  const preview=document.getElementById('companyLogoPreview');
+  if(preview){
+    preview.src=e.logo || document.querySelector('.sidebar-avatar img')?.src || document.querySelector('.brand-logo')?.src || '';
+  }
+}
+function salvarDadosEmpresa(){
+  const atual=obterDadosEmpresa();
+  const dados={
+    ...atual,
+    nome:(document.getElementById('empresaNome')?.value||'').trim(),
+    cnpj:(document.getElementById('empresaCnpj')?.value||'').trim(),
+    telefone:(document.getElementById('empresaTelefone')?.value||'').trim(),
+    instagram:(document.getElementById('empresaInstagram')?.value||'').trim(),
+    email:(document.getElementById('empresaEmail')?.value||'').trim(),
+    cep:(document.getElementById('empresaCep')?.value||'').trim(),
+    endereco:(document.getElementById('empresaEndereco')?.value||'').trim(),
+    cidade:(document.getElementById('empresaCidade')?.value||'').trim(),
+    uf:(document.getElementById('empresaUf')?.value||'').trim().toUpperCase()
+  };
+  salvarEmpresaStorage(dados);
+  aplicarDadosEmpresa();
+  carregarFormularioEmpresa();
+  alert('Dados da empresa salvos com sucesso.');
+}
+function carregarLogoEmpresa(event){
+  const file=event.target.files?.[0];
+  if(!file)return;
+  if(!file.type.startsWith('image/')){alert('Selecione uma imagem válida.');return}
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const e=obterDadosEmpresa();
+    e.logo=String(reader.result||'');
+    salvarEmpresaStorage(e);
+    aplicarDadosEmpresa();
+    carregarFormularioEmpresa();
+  };
+  reader.readAsDataURL(file);
+}
+function restaurarDadosEmpresa(){
+  if(!confirm('Deseja restaurar os dados padrão da empresa?'))return;
+  const padrao={...RPRINT_EMPRESA_PADRAO};
+  salvarEmpresaStorage(padrao);
+  aplicarDadosEmpresa();
+  carregarFormularioEmpresa();
+  alert('Dados padrão restaurados.');
+}
+function esconderMinhaEmpresa(){
+  document.getElementById('minhaEmpresaPanel')?.classList.remove('show');
+}
+
+window.mostrarMinhaEmpresa=function(){
+  const home=document.getElementById('homePanel');
+  const quote=document.getElementById('mainQuote');
+  if(home)home.style.display='none';
+  if(quote)quote.style.display='none';
+
+  ['savedPanel','pedidosPanel','clientsPanel','productsAdminPanel','backupPanel',
+   'dashboardFinanceiroPanel','pagamentosPanel','despesasPanel']
+   .forEach(id=>document.getElementById(id)?.classList.remove('show'));
+
+  const topbar=document.getElementById('mainTopbar');
+  if(topbar)topbar.style.display='flex';
+
+  document.getElementById('minhaEmpresaPanel')?.classList.add('show');
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('navMinhaEmpresa')?.classList.add('active');
+  carregarFormularioEmpresa();
+};
+
+// Em vez de embrulhar funções já existentes (o que pode causar conflitos),
+// apenas escutamos os cliques nos outros itens para esconder este painel.
+window.addEventListener('load',()=>{
+  aplicarDadosEmpresa();
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(btn=>{
+    if(btn.id!=='navMinhaEmpresa'){
+      btn.addEventListener('click',esconderMinhaEmpresa);
+    }
+  });
+});
+</script>
+
+
+<div id="localUserProfileBackdrop" class="local-user-profile-backdrop">
+  <div class="local-user-profile-modal">
+    <div class="local-user-profile-head">
+      <div>
+        <h3>Perfil do usuário</h3>
+        <p>Altere a foto do usuário que está conectado.</p>
+      </div>
+      <button type="button" onclick="fecharPerfilUsuarioLocal()">×</button>
+    </div>
+
+    <div class="local-user-profile-body">
+      <div class="local-user-profile-preview">
+        <div class="local-user-profile-photo">
+          <img id="localUserProfilePhotoPreview" alt="Foto do usuário">
+          <span id="localUserProfileFallback" class="local-user-profile-fallback">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="8" r="3.5"></circle>
+              <path d="M5 20c.7-4 3.1-6 7-6s6.3 2 7 6"></path>
+            </svg>
+          </span>
+        </div>
+        <strong id="localUserProfileName"></strong>
+      </div>
+
+      <input id="localUserPhotoInput" type="file" accept="image/png,image/jpeg,image/webp" hidden onchange="alterarFotoUsuarioLocal(event)">
+
+      <div class="local-user-profile-actions">
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('localUserPhotoInput').click()">Escolher foto</button>
+        <button type="button" class="btn btn-outline" onclick="removerFotoUsuarioLocal()">Remover foto</button>
+      </div>
